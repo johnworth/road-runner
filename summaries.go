@@ -3,9 +3,10 @@ package main
 import (
 	"encoding/csv"
 	"io"
-	"model"
 	"os"
 	"path"
+
+	"github.com/cyverse-de/model"
 )
 
 func writeCSV(fileWriter io.Writer, records [][]string) (err error) {

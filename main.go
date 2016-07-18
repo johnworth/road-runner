@@ -7,23 +7,23 @@
 package main
 
 import (
-	"configurate"
-	"dockerops"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
-	"logcabin"
-	"messaging"
-	"model"
 	"os"
 	"os/signal"
 	"path"
 	"syscall"
 	"time"
 
+	"github.com/cyverse-de/configurate"
+	"github.com/cyverse-de/dockerops"
+	"github.com/cyverse-de/logcabin"
+	"github.com/cyverse-de/messaging"
+	"github.com/cyverse-de/model"
 	"github.com/olebedev/config"
 	"github.com/streadway/amqp"
 )

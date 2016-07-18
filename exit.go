@@ -1,11 +1,12 @@
 package main
 
 import (
-	"dockerops"
-	"logcabin"
-	"messaging"
-	"model"
 	"strconv"
+
+	"github.com/cyverse-de/dockerops"
+	"github.com/cyverse-de/logcabin"
+	"github.com/cyverse-de/messaging"
+	"github.com/cyverse-de/model"
 )
 
 func cleanup(job *model.Job) {

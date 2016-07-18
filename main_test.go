@@ -1,17 +1,17 @@
 package main
 
 import (
-	"configurate"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"messaging"
-	"model"
 	"os"
 	"path"
 	"testing"
 	"time"
 
+	"github.com/cyverse-de/configurate"
+	"github.com/cyverse-de/messaging"
+	"github.com/cyverse-de/model"
 	"github.com/olebedev/config"
 	"github.com/streadway/amqp"
 )
@@ -33,7 +33,7 @@ func uri() string {
 }
 
 func JSONData() ([]byte, error) {
-	f, err := os.Open("../test/test_runner.json")
+	f, err := os.Open("test/test_runner.json")
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +47,7 @@ func JSONData() ([]byte, error) {
 func _inittests(t *testing.T, memoize bool) *model.Job {
 	var err error
 	if s == nil || !memoize {
-		cfg, err = configurate.Init("../test/test_config.yaml")
+		cfg, err = configurate.Init("test/test_config.yaml")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -231,7 +231,7 @@ func TestApplyDelta(t *testing.T) {
 
 func TestCopyJobFile(t *testing.T) {
 	uuid := "00000000-0000-0000-0000-000000000000"
-	from := path.Join("../test", fmt.Sprintf("%s.json", uuid))
+	from := path.Join("test", fmt.Sprintf("%s.json", uuid))
 	to := "/tmp"
 	err := copyJobFile(uuid, from, to)
 	if err != nil {
@@ -249,7 +249,7 @@ func TestCopyJobFile(t *testing.T) {
 
 func TestDeleteJobFile(t *testing.T) {
 	uuid := "00000000-0000-0000-0000-000000000000"
-	from := path.Join("../test", fmt.Sprintf("%s.json", uuid))
+	from := path.Join("test", fmt.Sprintf("%s.json", uuid))
 	to := "/tmp"
 	err := copyJobFile(uuid, from, to)
 	if err != nil {

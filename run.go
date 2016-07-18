@@ -1,14 +1,15 @@
 package main
 
 import (
-	"dockerops"
 	"fmt"
-	"logcabin"
-	"messaging"
-	"model"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/cyverse-de/dockerops"
+	"github.com/cyverse-de/logcabin"
+	"github.com/cyverse-de/messaging"
+	"github.com/cyverse-de/model"
 )
 
 func getTicker(timeLimit int, exit chan messaging.StatusCode) (chan int, error) {

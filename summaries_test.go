@@ -18,7 +18,7 @@ test2,test2,test2
 		{"test1", "test1", "test1"},
 		{"test2", "test2", "test2"},
 	}
-	outputPath := path.Join("../test", "TestWriteCSV.csv")
+	outputPath := path.Join("test", "TestWriteCSV.csv")
 	outputFile, err := os.Create(outputPath)
 	if err != nil {
 		t.Error(err)
@@ -47,10 +47,10 @@ Application ID,c7f05682-23c8-4182-b9a2-e09650a5f49b
 Application Name,Word Count
 Submitted By,test_this_is_a_test
 `
-	if err := writeJobSummary("../test", s); err != nil {
+	if err := writeJobSummary("test", s); err != nil {
 		t.Error(err)
 	}
-	outPath := "../test/JobSummary.csv"
+	outPath := "test/JobSummary.csv"
 	input, err := ioutil.ReadFile(outPath)
 	if err != nil {
 		t.Error(err)
@@ -80,10 +80,10 @@ func TestWriteJobParameters(t *testing.T) {
 	expected := `Executable,Argument Option,Argument Value
 ,,This is a test
 `
-	if err := writeJobParameters("../test", s); err != nil {
+	if err := writeJobParameters("test", s); err != nil {
 		t.Error(err)
 	}
-	outPath := "../test/JobParameters.csv"
+	outPath := "test/JobParameters.csv"
 	input, err := ioutil.ReadFile(outPath)
 	if err != nil {
 		t.Error(err)
