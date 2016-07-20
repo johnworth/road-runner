@@ -2,6 +2,14 @@
 	"version": 0,
 	"dependencies": [
 		{
+			"importpath": "github.com/Microsoft/go-winio",
+			"repository": "https://github.com/Microsoft/go-winio",
+			"vcs": "git",
+			"revision": "ce2922f643c8fd76b46cadc7f404a06282678b34",
+			"branch": "master",
+			"notests": true
+		},
+		{
 			"importpath": "github.com/Sirupsen/logrus",
 			"repository": "https://github.com/Sirupsen/logrus",
 			"vcs": "git",
@@ -21,8 +29,8 @@
 			"importpath": "github.com/cyverse-de/dockerops",
 			"repository": "https://github.com/cyverse-de/dockerops",
 			"vcs": "git",
-			"revision": "5225441b2fbee6c5b8508b4027c80037174e54db",
-			"branch": "master",
+			"revision": "fa3cbc3ab44b45ac0b75d241483c213215992ca1",
+			"branch": "dev",
 			"notests": true
 		},
 		{
@@ -184,6 +192,15 @@
 			"notests": true
 		},
 		{
+			"importpath": "github.com/docker/engine-api/client",
+			"repository": "https://github.com/docker/engine-api",
+			"vcs": "git",
+			"revision": "55fc2a3c372dd40020d511a64926027a3051c677",
+			"branch": "master",
+			"path": "/client",
+			"notests": true
+		},
+		{
 			"importpath": "github.com/docker/engine-api/types",
 			"repository": "https://github.com/docker/engine-api",
 			"vcs": "git",
@@ -199,6 +216,24 @@
 			"revision": "990a1a1a70b0da4c4cb70e117971a4f0babfbf1a",
 			"branch": "master",
 			"path": "/nat",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/docker/go-connections/sockets",
+			"repository": "https://github.com/docker/go-connections",
+			"vcs": "git",
+			"revision": "990a1a1a70b0da4c4cb70e117971a4f0babfbf1a",
+			"branch": "master",
+			"path": "sockets",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/docker/go-connections/tlsconfig",
+			"repository": "https://github.com/docker/go-connections",
+			"vcs": "git",
+			"revision": "990a1a1a70b0da4c4cb70e117971a4f0babfbf1a",
+			"branch": "master",
+			"path": "/tlsconfig",
 			"notests": true
 		},
 		{
@@ -337,12 +372,30 @@
 			"notests": true
 		},
 		{
+			"importpath": "golang.org/x/net/proxy",
+			"repository": "https://go.googlesource.com/net",
+			"vcs": "git",
+			"revision": "4d38db76854b199960801a1734443fd02870d7e1",
+			"branch": "master",
+			"path": "/proxy",
+			"notests": true
+		},
+		{
 			"importpath": "golang.org/x/sys/unix",
 			"repository": "https://go.googlesource.com/sys",
 			"vcs": "git",
 			"revision": "a646d33e2ee3172a661fc09bca23bb4889a41bc8",
 			"branch": "master",
 			"path": "/unix",
+			"notests": true
+		},
+		{
+			"importpath": "golang.org/x/sys/windows",
+			"repository": "https://go.googlesource.com/sys",
+			"vcs": "git",
+			"revision": "a646d33e2ee3172a661fc09bca23bb4889a41bc8",
+			"branch": "master",
+			"path": "/windows",
 			"notests": true
 		},
 		{
