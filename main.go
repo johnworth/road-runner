@@ -113,6 +113,19 @@ func running(client *messaging.Client, job *model.Job, msg string) {
 	logcabin.Info.Print(msg)
 }
 
+func impendingCancellation(client *messaging.Client, job *model.Job, msg string) {
+	err := client.PublishJobUpdate(&messaging.UpdateMessage{
+		Job:     job,
+		State:   messaging.ImpendingCancellationState,
+		Message: msg,
+		Sender:  hostname(),
+	})
+	if err != nil {
+		logcabin.Error.Print(err)
+	}
+	logcabin.Info.Print(msg)
+}
+
 // TimeTracker tracks when road-runner should exit.
 type TimeTracker struct {
 	Timer   *time.Timer
