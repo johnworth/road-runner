@@ -12,28 +12,78 @@ import (
 	"github.com/cyverse-de/model"
 )
 
-func getTicker(timeLimit int, exit chan messaging.StatusCode) (chan int, error) {
+// The cancellation buffer is the time between the job cancellation warning message and
+// the time that the job is actually canceled. The buffer is 20% of the total allotted
+// job execution time with a minimum duration of 30 seconds and a maximum duration of 5
+// minutes. If the allotted job run time is less than thirty seconds then no warning
+// message will be sent.
+const cancellationBufferFactor = float64(0.2)
+const minCancellationBuffer = 30 * time.Second
+const maxCancellationBuffer = 5 * time.Minute
+const cancellationBufferThreshold = 2 * minCancellationBuffer
+
+func determineCancellationWarningBuffer(jobDuration time.Duration) time.Duration {
+
+	// Don't bother with a cancellation warning if the allotted run time is too short.
+	if jobDuration < cancellationBufferThreshold {
+		return 0
+	}
+
+	// Determine how long before the allotted job cancellation time we should send the warning.
+	buffer := time.Duration(float64(jobDuration) * cancellationBufferFactor)
+	if buffer < minCancellationBuffer {
+		return minCancellationBuffer
+	} else if buffer > maxCancellationBuffer {
+		return maxCancellationBuffer
+	} else {
+		return buffer
+	}
+}
+
+func (r *JobRunner) getTicker(timeLimit int, exit chan messaging.StatusCode) (chan int, error) {
 	if timeLimit <= 0 {
-		return nil, fmt.Errorf("TimeLimit was not %d instead of > 0", timeLimit)
+		return nil, fmt.Errorf("TimeLimit was %d instead of > 0", timeLimit)
 	}
 
-	stepDuration, err := time.ParseDuration(fmt.Sprintf("%ds", timeLimit))
-	if err != nil {
-		return nil, fmt.Errorf("Could not parse duration: %s", err)
+	// Determine the step duration.
+	stepDuration := time.Duration(timeLimit) * time.Second
+
+	// Create a job cancellation warning ticker if the job length isn't too short.
+	var warnTicker *time.Ticker
+	cancellationWarningBuffer := determineCancellationWarningBuffer(stepDuration)
+	if cancellationWarningBuffer > 0 {
+		warnTicker = time.NewTicker(stepDuration - cancellationWarningBuffer)
 	}
 
+	// Create the cancellation ticker and a channel to accept a command to stop the tickers.
 	stepTicker := time.NewTicker(stepDuration)
 	quitTicker := make(chan int)
 
-	go func(*time.Ticker, chan int) {
-		select {
-		case <-stepTicker.C:
-			logcabin.Info.Print("ticker received message to exit")
-			exit <- messaging.StatusTimeLimit
-		case <-quitTicker:
-			logcabin.Info.Print("ticker received message to quit")
+	go func(stepTicker *time.Ticker) {
+		_ = <-stepTicker.C
+		logcabin.Info.Print("ticker received message to exit")
+		exit <- messaging.StatusTimeLimit
+	}(stepTicker)
+
+	if warnTicker != nil {
+		go func(warnTicker *time.Ticker, cancellationWarningBuffer time.Duration) {
+			_ = <-warnTicker.C
+			logcabin.Info.Print("ticker received message to warn user of impending cancellation")
+			impendingCancellation(r.client, r.job, fmt.Sprintf(
+				"Job will be canceled if the current step does not complete in %s",
+				cancellationWarningBuffer.String(),
+			))
+		}(warnTicker, cancellationWarningBuffer)
+	}
+
+	go func(stepTicker, warnTicker *time.Ticker, quitTicker chan int) {
+		_ = <-quitTicker
+		stepTicker.Stop()
+		if warnTicker != nil {
+			warnTicker.Stop()
 		}
-	}(stepTicker, quitTicker)
+		logcabin.Info.Print("received message to stop tickers")
+	}(stepTicker, warnTicker, quitTicker)
 
 	return quitTicker, nil
 }
@@ -141,7 +191,7 @@ func (r *JobRunner) runAllSteps(exit chan messaging.StatusCode) error {
 		// Start up the ticker
 		var tickerQuit chan int
 		if timeLimitEnabled {
-			tickerQuit, err = getTicker(step.Component.TimeLimit, exit)
+			tickerQuit, err = r.getTicker(step.Component.TimeLimit, exit)
 			if err != nil {
 				logcabin.Error.Print(err)
 				timeLimitEnabled = false

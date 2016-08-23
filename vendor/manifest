@@ -45,7 +45,7 @@
 			"importpath": "github.com/cyverse-de/messaging",
 			"repository": "https://github.com/cyverse-de/messaging",
 			"vcs": "git",
-			"revision": "d790754ea90b647a4e4bfe7a22b1e40b68785746",
+			"revision": "26bd8046da9aa9cf764287b4c7edfbcc66b6f535",
 			"branch": "master",
 			"notests": true
 		},
