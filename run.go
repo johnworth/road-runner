@@ -220,15 +220,14 @@ func (r *JobRunner) runAllSteps(exit chan messaging.StatusCode) error {
 					),
 				)
 			} else {
-				running(r.client, r.job,
-					fmt.Sprintf(
-						"Tool container %s:%s with arguments '%s' exit with code: %d",
-						step.Component.Container.Image.Name,
-						step.Component.Container.Image.Tag,
-						strings.Join(step.Arguments(), " "),
-						exitCode,
-					),
+				err = fmt.Errorf(
+					"Tool container %s:%s with arguments '%s' exit with code: %d",
+					step.Component.Container.Image.Name,
+					step.Component.Container.Image.Tag,
+					strings.Join(step.Arguments(), " "),
+					exitCode,
 				)
+				running(r.client, r.job, err.Error())
 			}
 			r.status = messaging.StatusStepFailed
 			return err
