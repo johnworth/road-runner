@@ -363,15 +363,6 @@
 			"notests": true
 		},
 		{
-			"importpath": "golang.org/x/net/context",
-			"repository": "https://go.googlesource.com/net",
-			"vcs": "git",
-			"revision": "075e191f18186a8ff2becaf64478e30f4545cdad",
-			"branch": "master",
-			"path": "/context",
-			"notests": true
-		},
-		{
 			"importpath": "golang.org/x/net/proxy",
 			"repository": "https://go.googlesource.com/net",
 			"vcs": "git",

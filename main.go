@@ -7,6 +7,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -18,8 +19,6 @@ import (
 	"path"
 	"syscall"
 	"time"
-
-	"golang.org/x/net/context"
 
 	"github.com/cyverse-de/configurate"
 	"github.com/cyverse-de/dockerops"
