@@ -36,41 +36,6 @@ var (
 	client *messaging.Client
 )
 
-func signals() {
-	c := make(chan os.Signal, 1)
-
-	signal.Notify(c, os.Interrupt, os.Kill, syscall.SIGTERM, syscall.SIGSTOP, syscall.SIGQUIT)
-
-	go func() {
-		sig := <-c
-
-		logcabin.Info.Println("Received signal:", sig)
-
-		if dckr == nil {
-			logcabin.Warning.Println("Docker client is nil, can't clean up. Probably don't need to.")
-		}
-
-		if job == nil {
-			logcabin.Warning.Println("Info didn't get parsed from the job file, can't clean up. Probably don't need to.")
-		}
-
-		if dckr != nil && job != nil {
-			cleanup(job)
-		}
-
-		if client != nil && job != nil {
-			fail(client, job, fmt.Sprintf("Received signal %s", sig))
-		}
-
-		os.Exit(-1)
-	}()
-}
-
-func init() {
-	logcabin.Init("road-runner", "road-runner")
-	signals()
-}
-
 func hostname() string {
 	h, err := os.Hostname()
 	if err != nil {
@@ -260,6 +225,49 @@ func deleteJobFile(uuid, toDir string) {
 }
 
 func main() {
+	logcabin.Init("road-runner", "road-runner")
+
+	sigquitter := make(chan bool)
+
+	sighandler := InitSignalHandler()
+
+	sighandler.Receive(
+		sigquitter,
+		func(sig os.Signal) {
+			logcabin.Info.Println("Received signal:", sig)
+
+			if dckr == nil {
+				logcabin.Warning.Println("Docker client is nil, can't clean up. Probably don't need to.")
+			}
+
+			if job == nil {
+				logcabin.Warning.Println("Info didn't get parsed from the job file, can't clean up. Probably don't need to.")
+			}
+
+			if dckr != nil && job != nil {
+				cleanup(job)
+			}
+
+			if client != nil && job != nil {
+				fail(client, job, fmt.Sprintf("Received signal %s", sig))
+			}
+
+			os.Exit(-1)
+		},
+		func() {
+			logcabin.Info.Println("Signal handler is quitting")
+		},
+	)
+
+	signal.Notify(
+		sighandler.Signals,
+		os.Interrupt,
+		os.Kill,
+		syscall.SIGTERM,
+		syscall.SIGSTOP,
+		syscall.SIGQUIT,
+	)
+
 	var (
 		showVersion = flag.Bool("version", false, "Print the version information")
 		jobFile     = flag.String("job", "", "The path to the job description file")
