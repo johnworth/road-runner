@@ -1,7 +1,5 @@
 FROM golang:1.7
 
-RUN go get github.com/jstemmer/go-junit-report
-
 COPY . /go/src/github.com/cyverse-de/road-runner
 RUN go install github.com/cyverse-de/road-runner
 

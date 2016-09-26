@@ -15,18 +15,10 @@ node('docker') {
         sh "docker build --rm --build-arg git_commit=${git_commit} -t ${dockerRepo} ."
 
 
-        dockerTestRunner = "test-${env.BUILD_TAG}"
-        dockerTestCleanup = "test-cleanup-${env.BUILD_TAG}"
         try {
             stage "Test"
-            try {
-              sh "docker run --rm --name ${dockerTestRunner} --entrypoint 'sh' ${dockerRepo} -c \"go test -v github.com/cyverse-de/${service.repo} | tee /dev/stderr | go-junit-report\" > test-results.xml"
-            } finally {
-                junit 'test-results.xml'
-
-                sh "docker run --rm --name ${dockerTestCleanup} -v \$(pwd):/build -w /build alpine rm -r test-results.xml"
-            }
-
+            dockerTestRunner = "test-${env.BUILD_TAG}"
+            sh "docker run --rm --name ${dockerTestRunner} --entrypoint 'go' ${dockerRepo} test github.com/cyverse-de/${service.repo}"
 
             stage "Docker Push"
             dockerPushRepo = "${service.dockerUser}/${service.repo}:${env.BRANCH_NAME}"
@@ -35,9 +27,6 @@ node('docker') {
         } finally {
             sh returnStatus: true, script: "docker kill ${dockerTestRunner}"
             sh returnStatus: true, script: "docker rm ${dockerTestRunner}"
-
-            sh returnStatus: true, script: "docker kill ${dockerTestCleanup}"
-            sh returnStatus: true, script: "docker rm ${dockerTestCleanup}"
 
             sh returnStatus: true, script: "docker rmi ${dockerRepo}"
         }
