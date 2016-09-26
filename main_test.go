@@ -87,13 +87,24 @@ func GetClient(t *testing.T) *messaging.Client {
 	if err != nil {
 		t.Error(err)
 	}
-	client.SetupPublishing(messaging.JobsExchange)
+	client.SetupPublishing(messagingExchangeName())
 	go client.Listen()
 	return client
 }
 
 func messagingURI() string {
-	return "amqp://guest:guest@rabbit:5672/"
+	ret, _ := cfg.String("amqp.uri")
+	return ret
+}
+
+func messagingExchangeName() string {
+	ret, _ := cfg.String("amqp.exchange.name")
+	return ret
+}
+
+func messagingExchangeType() string {
+	ret, _ := cfg.String("amqp.exchange.type")
+	return ret
 }
 
 func TestRegisterTimeLimitDeltaListener(t *testing.T) {
@@ -115,7 +126,7 @@ func TestRegisterTimeLimitDeltaListener(t *testing.T) {
 	client.SendTimeLimitDelta(invID, "9h")
 	time.Sleep(1000 * time.Millisecond)
 	if timeTracker.EndDate == unwanted {
-		t.Errorf("EndDate was still set to the default after sending a delta")
+		t.Error("EndDate was still set to the default after sending a delta")
 	}
 }
 
@@ -144,7 +155,7 @@ func TestRegisterTimeLimitRequestListener(t *testing.T) {
 	key := messaging.TimeLimitResponsesKey(invID)
 
 	// This will listen for the messages sent out as a response by RegisterTimeLimitRequestListener
-	client.AddConsumer(messaging.JobsExchange, "topic", "yay", key, handler)
+	client.AddConsumer(messagingExchangeName(), messagingExchangeType(), "yay", key, handler)
 
 	// Listen for time limit requests
 	RegisterTimeLimitRequestListener(client, timeTracker, invID)
@@ -264,14 +275,15 @@ func TestDeleteJobFile(t *testing.T) {
 
 func TestJobWithoutCancellationWarning(t *testing.T) {
 	if determineCancellationWarningBuffer(59*time.Second) != 0 {
-		t.Errorf("A timeout warning message would be produced when it shouldn't")
+		t.Error("A timeout warning message would be produced when it shouldn't")
 	}
 }
 
 func TestJobWithMinimumWarningBuffer(t *testing.T) {
 	cancellationWarningBuffer := determineCancellationWarningBuffer(61 * time.Second)
 	if cancellationWarningBuffer == 0 {
-		t.Errorf("A timeout warning would not be produced when it should")
+		t.Error("A timeout warning would" +
+			" not be produced when it should")
 	} else if cancellationWarningBuffer != minCancellationBuffer {
 		t.Errorf(
 			"Unexpected duration between cancellation warning and job cancellation: %s",
@@ -283,7 +295,7 @@ func TestJobWithMinimumWarningBuffer(t *testing.T) {
 func TestJobWithDefaultWarningBuffer(t *testing.T) {
 	cancellationWarningBuffer := determineCancellationWarningBuffer(500 * time.Second)
 	if cancellationWarningBuffer == 0 {
-		t.Errorf("A timeout warning would not be produced when it should")
+		t.Error("A timeout warning would not be produced when it should")
 	} else if cancellationWarningBuffer != 100*time.Second {
 		t.Errorf(
 			"Unexpected duration between cancellation warning and job cancellation: %s",
@@ -295,7 +307,7 @@ func TestJobWithDefaultWarningBuffer(t *testing.T) {
 func TestJobWithMaximumWarningBuffer(t *testing.T) {
 	cancellationWarningBuffer := determineCancellationWarningBuffer(30 * time.Minute)
 	if cancellationWarningBuffer == 0 {
-		t.Errorf("A timeout warning would not be produced when it should")
+		t.Error("A timeout warning would not be produced when it should")
 	} else if cancellationWarningBuffer != maxCancellationBuffer {
 		t.Errorf(
 			"Unexpected duration between cancellation warning and job cancellation: %s",
