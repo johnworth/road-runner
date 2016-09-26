@@ -20,8 +20,8 @@ node {
         dockerTestRunner = "test-${env.BUILD_TAG}"
         sh "docker run --rm --name ${dockerTestRunner} --entrypoint 'go' ${dockerRepo} test github.com/cyverse-de/${repo}"
     } finally {
-        sh returnStatus: true, script: "docker kill ${dockerTestRunner}"
-        sh returnStatus: true, script: "docker rm ${dockerTestRunner}"
+        sh returnStatus: true, script: "docker kill ${dockerTestRunner} || echo \"Moving along\""
+        sh returnStatus: true, script: "docker rm ${dockerTestRunner} || echo \"Moving along\""
     }
 
 
