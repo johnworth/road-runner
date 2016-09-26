@@ -33,13 +33,13 @@ node('docker') {
             sh "docker tag ${dockerRepo} ${dockerPushRepo}"
             sh "docker push ${dockerPushRepo}"
         } finally {
-            sh returnStatus: true, script: "docker kill ${dockerTestRunner}"
-            sh returnStatus: true, script: "docker rm ${dockerTestRunner}"
+            sh returnStatus: true, script: "docker kill ${dockerTestRunner} || echo 'Moving along'"
+            sh returnStatus: true, script: "docker rm ${dockerTestRunner} || echo 'Moving along'"
 
-            sh returnStatus: true, script: "docker kill ${dockerTestCleanup}"
-            sh returnStatus: true, script: "docker rm ${dockerTestCleanup}"
+            sh returnStatus: true, script: "docker kill ${dockerTestCleanup} || echo 'Moving along'"
+            sh returnStatus: true, script: "docker rm ${dockerTestCleanup} || echo 'Moving along'"
 
-            sh returnStatus: true, script: "docker rmi ${dockerRepo}"
+            sh returnStatus: true, script: "docker rmi ${dockerRepo} || echo 'Moving along'"
         }
     } catch (InterruptedException e) {
         currentBuild.result = "ABORTED"
