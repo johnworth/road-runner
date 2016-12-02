@@ -26,8 +26,9 @@ import (
 	"github.com/cyverse-de/messaging"
 	"github.com/cyverse-de/model"
 	"github.com/cyverse-de/version"
-	"github.com/olebedev/config"
 	"github.com/streadway/amqp"
+
+	"github.com/spf13/viper"
 )
 
 var (
@@ -297,7 +298,7 @@ func main() {
 		writeTo     = flag.String("write-to", "/opt/image-janitor", "The directory to copy job files to.")
 		dockerURI   = flag.String("docker", "unix:///var/run/docker.sock", "The URI for connecting to docker.")
 		err         error
-		cfg         *config.Config
+		cfg         *viper.Viper
 	)
 
 	flag.Parse()
@@ -343,20 +344,9 @@ func main() {
 		logcabin.Error.Fatal(err)
 	}
 
-	uri, err := cfg.String("amqp.uri")
-	if err != nil {
-		logcabin.Error.Fatal(err)
-	}
-
-	amqpExchangeName, err = cfg.String("amqp.exchange.name")
-	if err != nil {
-		logcabin.Error.Fatal(err)
-	}
-
-	amqpExchangeType, err = cfg.String("amqp.exchange.type")
-	if err != nil {
-		logcabin.Error.Fatal(err)
-	}
+	uri := cfg.GetString("amqp.uri")
+	amqpExchangeName = cfg.GetString("amqp.exchange.name")
+	amqpExchangeType = cfg.GetString("amqp.exchange.type")
 
 	client, err = messaging.NewClient(uri, true)
 	if err != nil {
