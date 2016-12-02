@@ -12,13 +12,14 @@ import (
 	"github.com/cyverse-de/configurate"
 	"github.com/cyverse-de/messaging"
 	"github.com/cyverse-de/model"
-	"github.com/olebedev/config"
 	"github.com/streadway/amqp"
+
+	"github.com/spf13/viper"
 )
 
 var (
 	s   *model.Job
-	cfg *config.Config
+	cfg *viper.Viper
 )
 
 func shouldrun() bool {
@@ -93,17 +94,17 @@ func GetClient(t *testing.T) *messaging.Client {
 }
 
 func messagingURI() string {
-	ret, _ := cfg.String("amqp.uri")
+	ret := cfg.GetString("amqp.uri")
 	return ret
 }
 
 func messagingExchangeName() string {
-	ret, _ := cfg.String("amqp.exchange.name")
+	ret := cfg.GetString("amqp.exchange.name")
 	return ret
 }
 
 func messagingExchangeType() string {
-	ret, _ := cfg.String("amqp.exchange.type")
+	ret := cfg.GetString("amqp.exchange.type")
 	return ret
 }
 

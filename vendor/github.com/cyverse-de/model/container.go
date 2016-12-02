@@ -19,6 +19,7 @@ type Device struct {
 type VolumesFrom struct {
 	Tag           string `json:"tag"`
 	Name          string `json:"name"`
+	Auth          string `json:"auth"`
 	NamePrefix    string `json:"name_prefix"`
 	URL           string `json:"url"`
 	HostPath      string `json:"host_path"`
@@ -31,6 +32,7 @@ type ContainerImage struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 	Tag  string `json:"tag"`
+	Auth string `json:"auth"`
 	URL  string `json:"url"`
 }
 
@@ -57,4 +59,12 @@ func (c *Container) WorkingDirectory() string {
 		return "/de-app-work"
 	}
 	return c.WorkingDir
+}
+
+// UsesVolumes returns a boolean value which indicates if a container uses host-mounted volumes
+func (c *Container) UsesVolumes() bool {
+	if len(c.Volumes) > 0 {
+		return true
+	}
+	return false
 }
