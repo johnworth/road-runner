@@ -259,14 +259,10 @@ func (d *Docker) DanglingImages() ([]string, error) {
 	return retval, nil
 }
 
-// Pull will pull an image indicated by name and tag. Name is in the format
-// "registry/repository". If the name doesn't contain a / then the registry
-// is assumed to be "base" and the provided name will be set to repository.
-// This assumes that no authentication is required.
-func (d *Docker) Pull(name, tag string) error {
+func (d *Docker) basePull(name, tag string, opts types.ImagePullOptions) error {
 	imageRef := fmt.Sprintf("%s:%s", name, tag)
 
-	body, err := d.Client.ImagePull(d.ctx, imageRef, types.ImagePullOptions{})
+	body, err := d.Client.ImagePull(d.ctx, imageRef, opts)
 	defer body.Close()
 	if err != nil {
 		return err
@@ -274,6 +270,22 @@ func (d *Docker) Pull(name, tag string) error {
 
 	_, err = io.Copy(os.Stdout, body)
 	return err
+}
+
+// Pull will pull an image indicated by name and tag. Name is in the format
+// "registry/repository". If the name doesn't contain a / then the registry
+// is assumed to be "base" and the provided name will be set to repository.
+// This assumes that no authentication is required.
+func (d *Docker) Pull(name, tag string) error {
+	return d.basePull(name, tag, types.ImagePullOptions{})
+}
+
+// PullAuthenticated is Pull, but with a third argument 'auth' which should be
+// the RegistryAuth needed by docker: base64(username + ':' + password)
+func (d *Docker) PullAuthenticated(name, tag, auth string) error {
+	return d.basePull(name, tag, types.ImagePullOptions{
+		RegistryAuth: auth,
+	})
 }
 
 func pathExists(p string) (bool, error) {

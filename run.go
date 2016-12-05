@@ -101,7 +101,11 @@ func (r *JobRunner) pullDataImages() error {
 	var err error
 	for _, dc := range r.job.DataContainers() {
 		running(r.client, r.job, fmt.Sprintf("Pulling container image %s:%s", dc.Name, dc.Tag))
-		err = r.dckr.Pull(dc.Name, dc.Tag)
+		if !dc.Auth || strings.TrimSpace(dc.Auth) == "" {
+			err = r.dckr.Pull(dc.Name, dc.Tag)
+		} else {
+			err = r.dckr.PullAuthenticated(dc.Name, dc.Tag, dc.Auth)
+		}
 		if err != nil {
 			r.status = messaging.StatusDockerPullFailed
 			running(r.client, r.job, fmt.Sprintf("Error pulling container image '%s:%s': %s", dc.Name, dc.Tag, err.Error()))
@@ -131,7 +135,11 @@ func (r *JobRunner) pullStepImages() error {
 	var err error
 	for _, ci := range r.job.ContainerImages() {
 		running(r.client, r.job, fmt.Sprintf("Pulling tool container %s:%s", ci.Name, ci.Tag))
-		err = r.dckr.Pull(ci.Name, ci.Tag)
+		if !ci.Auth || strings.TrimSpace(ci.Auth) == "" {
+			err = r.dckr.Pull(ci.Name, ci.Tag)
+		} else {
+			err = r.dckr.PullAuthenticated(ci.Name, ci.Tag, ci.Auth)
+		}
 		if err != nil {
 			r.status = messaging.StatusDockerPullFailed
 			running(r.client, r.job, fmt.Sprintf("Error pulling tool container '%s:%s': %s", ci.Name, ci.Tag, err.Error()))
