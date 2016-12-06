@@ -104,6 +104,7 @@ func (r *JobRunner) pullDataImages() error {
 		if strings.TrimSpace(dc.Auth) == "" {
 			err = r.dckr.Pull(dc.Name, dc.Tag)
 		} else {
+			running(r.client, r.job, fmt.Sprintf("Using auth for pull of %s:%s", dc.Name, dc.Tag))
 			err = r.dckr.PullAuthenticated(dc.Name, dc.Tag, dc.Auth)
 		}
 		if err != nil {
@@ -138,6 +139,7 @@ func (r *JobRunner) pullStepImages() error {
 		if strings.TrimSpace(ci.Auth) == "" {
 			err = r.dckr.Pull(ci.Name, ci.Tag)
 		} else {
+			running(r.client, r.job, fmt.Sprintf("Using auth for pull of %s:%s", ci.Name, ci.Tag))
 			err = r.dckr.PullAuthenticated(ci.Name, ci.Tag, ci.Auth)
 		}
 		if err != nil {
