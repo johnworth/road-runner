@@ -443,6 +443,24 @@
 			"notests": true
 		},
 		{
+			"importpath": "github.com/docker/engine-api/client",
+			"repository": "https://github.com/docker/engine-api",
+			"vcs": "git",
+			"revision": "4290f40c056686fcaa5c9caf02eac1dde9315adf",
+			"branch": "master",
+			"path": "/client",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/docker/engine-api/types",
+			"repository": "https://github.com/docker/engine-api",
+			"vcs": "git",
+			"revision": "4290f40c056686fcaa5c9caf02eac1dde9315adf",
+			"branch": "master",
+			"path": "types",
+			"notests": true
+		},
+		{
 			"importpath": "github.com/docker/go-connections/nat",
 			"repository": "https://github.com/docker/go-connections",
 			"vcs": "git",
