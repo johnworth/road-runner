@@ -16,6 +16,7 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
+	nat "github.com/docker/go-connections/nat"
 	"github.com/spf13/viper"
 )
 
@@ -470,6 +471,22 @@ func (d *Docker) runContainer(containerID string, stdout, stderr io.Writer) (int
 
 	//wait for container to exit
 	return d.Client.ContainerWait(d.ctx, containerID)
+}
+
+// InspectContainer returns a types.ContainerJSON with details about the container.
+func (d *Docker) InspectContainer(containerID string) (types.ContainerJSON, error) {
+	return d.Client.ContainerInspect(d.ctx, containerID)
+}
+
+// ContainerPortMapping returns a *nat.PortMap of all of the port mappings. This
+// is basically just a convenience function that calls InspectContainer and
+// roots through the return value for the port mapping.
+func (d *Docker) ContainerPortMapping(containerID string) (nat.PortMap, error) {
+	inspection, err := d.InspectContainer(containerID)
+	if err != nil {
+		return nil, err
+	}
+	return inspection.NetworkSettings.Ports, err
 }
 
 // RunStep will run the steps in a job. If a step fails, the function will
