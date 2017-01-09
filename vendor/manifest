@@ -46,8 +46,8 @@
 			"importpath": "github.com/cyverse-de/dockerops",
 			"repository": "https://github.com/cyverse-de/dockerops",
 			"vcs": "git",
-			"revision": "602db8b126859659304b9f61b86ca83a8adfe019",
-			"branch": "master",
+			"revision": "4b2204a8bb5443a339ff83ebd2f15e0786e0ac8a",
+			"branch": "docker-client",
 			"notests": true
 		},
 		{
@@ -113,9 +113,9 @@
 			"importpath": "github.com/docker/docker/api/types",
 			"repository": "https://github.com/docker/docker",
 			"vcs": "git",
-			"revision": "fe9f5610c49b1a6ca2ebbb68c1478fc7f106eaa8",
+			"revision": "cd82a31edbae37c31212ac8b23180d90735ceab4",
 			"branch": "master",
-			"path": "api/types",
+			"path": "/api/types",
 			"notests": true
 		},
 		{
