@@ -163,11 +163,8 @@ func (d *Docker) NukeContainerByName(name string) error {
 
 // ImageID returns the image ID as a string for image with the given name and tag.
 func (d *Docker) ImageID(name, tag string) (string, error) {
-	imageFilter := filters.NewArgs()
-	imageFilter.Add("name", name)
 	images, err := d.Client.ImageList(d.ctx, types.ImageListOptions{
-		Filters: imageFilter,
-		All:     true,
+		All: true,
 	})
 	if err != nil {
 		return "", nil
@@ -201,6 +198,23 @@ func (d *Docker) removeImage(id string, force, prune bool) error {
 // SafelyRemoveImageByID will delete the image referenced by its ID.
 func (d *Docker) SafelyRemoveImageByID(id string) error {
 	return d.removeImage(id, false, false)
+}
+
+// InspectImage will return a types.ImageInspect instance filled out for the
+// image with the provided ID.
+func (d *Docker) InspectImage(id string) (types.ImageInspect, error) {
+	retval, _, err := d.Client.ImageInspectWithRaw(d.ctx, id)
+	return retval, err
+}
+
+// ExposedPortsForImage returns a nat.PortSet for the image with the given ID.
+// Convenience function that uses InspectImage().
+func (d *Docker) ExposedPortsForImage(id string) (nat.PortSet, error) {
+	inspection, err := d.InspectImage(id)
+	if err != nil {
+		return nil, err
+	}
+	return inspection.Config.ExposedPorts, err
 }
 
 // SafelyRemoveImage will delete the image with force set to false
@@ -331,6 +345,9 @@ func (d *Docker) CreateContainerFromStep(step *model.Step, invID string) (string
 			config.NetworkDisabled = true
 		}
 		hostConfig.NetworkMode = container.NetworkMode(step.Component.Container.NetworkMode)
+	}
+	if !config.NetworkDisabled {
+		hostConfig.PublishAllPorts = true
 	}
 
 	// Set the name of the image for the container.
