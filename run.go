@@ -14,7 +14,6 @@ import (
 
 // The cancellation buffer is the time between the job cancellation warning message and
 // the time that the job is actually canceled. The buffer is 20% of the total allotted
-// job execution time with a minimum duration of 30 seconds and a maximum duration of 5
 // minutes. If the allotted job run time is less than thirty seconds then no warning
 // message will be sent.
 const cancellationBufferFactor = float64(0.2)
@@ -154,7 +153,7 @@ func (r *JobRunner) pullStepImages() error {
 
 func (r *JobRunner) downloadInputs() error {
 	var err error
-	var exitCode int
+	var exitCode int64
 	for idx, input := range r.job.Inputs() {
 		running(r.client, r.job, fmt.Sprintf("Downloading %s", input.IRODSPath()))
 		exitCode, err = dckr.DownloadInputs(r.job, &input, idx)
@@ -174,7 +173,7 @@ func (r *JobRunner) downloadInputs() error {
 
 func (r *JobRunner) runAllSteps(exit chan messaging.StatusCode) error {
 	var err error
-	var exitCode int
+	var exitCode int64
 
 	for idx, step := range r.job.Steps {
 		running(r.client, r.job,
@@ -256,7 +255,7 @@ func (r *JobRunner) runAllSteps(exit chan messaging.StatusCode) error {
 func (r *JobRunner) uploadOutputs() error {
 	var (
 		err      error
-		exitCode int
+		exitCode int64
 	)
 
 	exitCode, err = dckr.UploadOutputs(r.job)
