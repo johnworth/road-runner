@@ -334,12 +334,12 @@ func Run(client *messaging.Client, dckr *dockerops.Docker, exit chan messaging.S
 		}
 	}
 
-	// Create the working directory volume
-	if runner.status == messaging.Success {
-		if _, err = runner.dckr.CreateWorkingDirVolume(job.InvocationID); err != nil {
-			logcabin.Error.Print(err)
-		}
-	}
+	// // Create the working directory volume
+	// if runner.status == messaging.Success {
+	// 	if _, err = runner.dckr.CreateWorkingDirVolume(job.InvocationID); err != nil {
+	// 		logcabin.Error.Print(err)
+	// 	}
+	// }
 
 	// If pulls didn't succeed then we can't guarantee that we've got the
 	// correct versions of the tools. Don't bother pulling in data in that case,
