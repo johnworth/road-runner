@@ -14,6 +14,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
 	nat "github.com/docker/go-connections/nat"
@@ -316,6 +317,39 @@ func pathExists(p string) (bool, error) {
 	return true, err
 }
 
+// CreateWorkingDirVolume creates a new volume that is used to contain the
+// working directory for a job.
+func (d *Docker) CreateWorkingDirVolume(volumeID string) (types.Volume, error) {
+	return d.Client.VolumeCreate(d.ctx, volume.VolumesCreateBody{
+		Driver: "local",
+		DriverOpts: map[string]string{
+			"type":   "none",
+			"device": "/tmp/foo",
+			"o":      "bind",
+		},
+		Name: volumeID,
+	})
+}
+
+// VolumeExists return true if the volume exists.
+func (d *Docker) VolumeExists(volumeID string) (bool, error) {
+	list, err := d.Client.VolumeList(d.ctx, filters.NewArgs())
+	if err != nil {
+		return false, err
+	}
+	for _, l := range list.Volumes {
+		if l.Name == volumeID {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// RemoveVolume deletes the working directory volume.
+func (d *Docker) RemoveVolume(volumeID string) error {
+	return d.Client.VolumeRemove(d.ctx, volumeID, true)
+}
+
 // CreateContainerFromStep creates a container from a step in the a job.
 // Returns the ID of the created container.
 func (d *Docker) CreateContainerFromStep(step *model.Step, invID string) (string, error) {
@@ -400,16 +434,32 @@ func (d *Docker) CreateContainerFromStep(step *model.Step, invID string) (string
 		}
 	}
 
-	// Add the hosts working directory as a binding to the container's
-	// working directory.
-	wd, err := os.Getwd()
+	// Check to see if a working directory volume exists
+	hasVolume, err := d.VolumeExists(invID)
 	if err != nil {
 		return "", err
 	}
-	hostConfig.Binds = append(
-		hostConfig.Binds,
-		fmt.Sprintf("%s:%s:%s", wd, step.Component.Container.WorkingDirectory(), "rw"),
-	)
+
+	// if the working directory volume exists, use it.
+	if hasVolume {
+		hostConfig.Binds = append(
+			hostConfig.Binds,
+			fmt.Sprintf("%s:%s:%s", invID, step.Component.Container.WorkingDirectory(), "rw"),
+		)
+	} else {
+		// Otherwise, bind the local working directory into the container as the working directory.
+		var wd string
+		// Add the hosts working directory as a binding to the container's
+		// working directory.
+		wd, err = os.Getwd()
+		if err != nil {
+			return "", err
+		}
+		hostConfig.Binds = append(
+			hostConfig.Binds,
+			fmt.Sprintf("%s:%s:%s", wd, step.Component.Container.WorkingDirectory(), "rw"),
+		)
+	}
 
 	logcabin.Info.Printf("Volumes: %#v", config.Volumes)
 	logcabin.Info.Printf("Binds: %#v", hostConfig.Binds)
@@ -424,6 +474,8 @@ func (d *Docker) CreateContainerFromStep(step *model.Step, invID string) (string
 		hostConfig.Devices = append(hostConfig.Devices, device)
 	}
 
+	// Set the default working directory in the container to the path defined in
+	// the job JSON.
 	config.WorkingDir = step.Component.Container.WorkingDirectory()
 
 	for k, v := range step.Environment {
@@ -565,13 +617,28 @@ func (d *Docker) CreateDownloadContainer(job *model.Job, input *model.StepInput,
 	config.Image = fmt.Sprintf("%s:%s", image, tag)
 	hostConfig.LogConfig = container.LogConfig{Type: "none"}
 
-	// make sure the host working dir is mounted and make it the default
-	// working dir inside the container.
-	if wd, err = os.Getwd(); err != nil {
+	config.WorkingDir = WORKDIR
+
+	// Check to see if a working directory volume exists
+	hasVolume, err := d.VolumeExists(invID)
+	if err != nil {
 		return "", err
 	}
-	config.WorkingDir = WORKDIR
-	hostConfig.Binds = append(hostConfig.Binds, fmt.Sprintf("%s:%s:%s", wd, WORKDIR, "rw"))
+
+	// if the working directory volume exists, use it.
+	if hasVolume {
+		hostConfig.Binds = append(
+			hostConfig.Binds,
+			fmt.Sprintf("%s:%s:%s", invID, WORKDIR, "rw"),
+		)
+	} else {
+		// make sure the host working dir is mounted and make it the default
+		// working dir inside the container.
+		if wd, err = os.Getwd(); err != nil {
+			return "", err
+		}
+		hostConfig.Binds = append(hostConfig.Binds, fmt.Sprintf("%s:%s:%s", wd, WORKDIR, "rw"))
+	}
 
 	config.Labels = make(map[string]string)
 	config.Labels[model.DockerLabelKey] = invID
@@ -628,6 +695,7 @@ func (d *Docker) CreateUploadContainer(job *model.Job) (string, error) {
 
 	config := &container.Config{}
 	hostConfig := &container.HostConfig{}
+	invID := job.InvocationID
 
 	if err = d.PorkPull(); err != nil {
 		return "", err
@@ -636,12 +704,27 @@ func (d *Docker) CreateUploadContainer(job *model.Job) (string, error) {
 	config.Image = fmt.Sprintf("%s:%s", image, tag)
 	hostConfig.LogConfig = container.LogConfig{Type: "none"}
 
-	if wd, err = os.Getwd(); err != nil {
+	config.WorkingDir = WORKDIR
+
+	// Check to see if a working directory volume exists
+	hasVolume, err := d.VolumeExists(invID)
+	if err != nil {
 		return "", err
 	}
-	config.WorkingDir = WORKDIR
-	hostConfig.Binds = append(hostConfig.Binds, fmt.Sprintf("%s:%s:%s", wd, WORKDIR, "rw"))
 
+	// if the working directory volume exists, use it.
+	if hasVolume {
+		hostConfig.Binds = append(
+			hostConfig.Binds,
+			fmt.Sprintf("%s:%s:%s", invID, WORKDIR, "rw"),
+		)
+	} else {
+		if wd, err = os.Getwd(); err != nil {
+			return "", err
+		}
+
+		hostConfig.Binds = append(hostConfig.Binds, fmt.Sprintf("%s:%s:%s", wd, WORKDIR, "rw"))
+	}
 	config.Labels = make(map[string]string)
 	config.Labels[model.DockerLabelKey] = job.InvocationID
 	config.Labels[TypeLabel] = strconv.Itoa(OutputContainer)

@@ -334,6 +334,13 @@ func Run(client *messaging.Client, dckr *dockerops.Docker, exit chan messaging.S
 		}
 	}
 
+	// Create the working directory volume
+	if runner.status == messaging.Success {
+		if _, err = runner.dckr.CreateWorkingDirVolume(job.InvocationID); err != nil {
+			logcabin.Error.Print(err)
+		}
+	}
+
 	// If pulls didn't succeed then we can't guarantee that we've got the
 	// correct versions of the tools. Don't bother pulling in data in that case,
 	// things are already screwed up.
@@ -347,6 +354,17 @@ func Run(client *messaging.Client, dckr *dockerops.Docker, exit chan messaging.S
 	// to run the steps if there's no/corrupted data to operate on.
 	if runner.status == messaging.Success {
 		if err = runner.runAllSteps(exit); err != nil {
+			logcabin.Error.Print(err)
+		}
+	}
+
+	var hasVolume bool
+	hasVolume, err = runner.dckr.VolumeExists(job.InvocationID)
+	if err != nil {
+		logcabin.Error.Print(err)
+	}
+	if hasVolume {
+		if err = runner.dckr.RemoveVolume(job.InvocationID); err != nil {
 			logcabin.Error.Print(err)
 		}
 	}
