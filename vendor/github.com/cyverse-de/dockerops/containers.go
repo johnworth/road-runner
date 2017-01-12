@@ -489,6 +489,9 @@ func (d *Docker) CreateContainerFromStep(step *model.Step, invID string) (string
 	hostConfig.LogConfig = container.LogConfig{Type: "none"}
 	containerName := step.Component.Container.Name
 
+	logcabin.Info.Printf("hostconfig: %#v\n", hostConfig)
+	logcabin.Info.Printf("config: %#v\n", config)
+
 	response, err := d.Client.ContainerCreate(d.ctx, config, hostConfig, nil, containerName)
 	if err == nil {
 		logcabin.Info.Printf("created container %s", response.ID)
@@ -610,6 +613,9 @@ func (d *Docker) CreateDownloadContainer(job *model.Job, input *model.StepInput,
 	hostConfig := &container.HostConfig{}
 	invID := job.InvocationID
 
+	image = d.cfg.GetString("porklock.image")
+	tag = d.cfg.GetString("porklock.tag")
+
 	if err = d.PorkPull(); err != nil {
 		return "", err
 	}
@@ -645,6 +651,9 @@ func (d *Docker) CreateDownloadContainer(job *model.Job, input *model.StepInput,
 	config.Labels[TypeLabel] = strconv.Itoa(InputContainer)
 	config.Cmd = input.Arguments(job.Submitter, job.FileMetadata)
 
+	logcabin.Info.Printf("hostconfig: %#v\n", hostConfig)
+	logcabin.Info.Printf("config: %#v\n", config)
+
 	name = fmt.Sprintf("input-%s-%s", idx, invID)
 	if response, err = d.Client.ContainerCreate(d.ctx, config, hostConfig, nil, name); err == nil {
 		logcabin.Info.Printf("created container %s", response.ID)
@@ -652,8 +661,11 @@ func (d *Docker) CreateDownloadContainer(job *model.Job, input *model.StepInput,
 			logcabin.Info.Printf("Warning creating %s: %s", response.ID, warning)
 		}
 	}
+	if err != nil {
+		logcabin.Error.Print(err)
+	}
 
-	return response.ID, nil
+	return response.ID, err
 }
 
 // DownloadInputs will run the docker containers that down input files into
@@ -697,6 +709,9 @@ func (d *Docker) CreateUploadContainer(job *model.Job) (string, error) {
 	hostConfig := &container.HostConfig{}
 	invID := job.InvocationID
 
+	image = d.cfg.GetString("porklock.image")
+	tag = d.cfg.GetString("porklock.tag")
+
 	if err = d.PorkPull(); err != nil {
 		return "", err
 	}
@@ -731,6 +746,9 @@ func (d *Docker) CreateUploadContainer(job *model.Job) (string, error) {
 
 	config.Cmd = job.FinalOutputArguments()
 
+	logcabin.Info.Printf("hostconfig: %#v\n", hostConfig)
+	logcabin.Info.Printf("config: %#v\n", config)
+
 	name = fmt.Sprintf("output-%s", job.InvocationID)
 	if response, err = d.Client.ContainerCreate(d.ctx, config, hostConfig, nil, name); err == nil {
 		logcabin.Info.Printf("created container %s", response.ID)
@@ -738,8 +756,11 @@ func (d *Docker) CreateUploadContainer(job *model.Job) (string, error) {
 			logcabin.Info.Printf("Warning creating %s: %s", response.ID, warning)
 		}
 	}
+	if err != nil {
+		logcabin.Error.Print(err)
+	}
 
-	return response.ID, nil
+	return response.ID, err
 }
 
 // UploadOutputs will upload files to iRODS from the local working directory.
