@@ -33,6 +33,10 @@ type Docker struct {
 // that are run as part of a job.
 const WORKDIR = "/de-app-work"
 
+// CONFIGDIR is the path to the local configs inside the containers that are
+// used to transfer files into and out of the job.
+const CONFIGDIR = "/configs"
+
 const (
 	// TypeLabel is the label key applied to every container.
 	TypeLabel = "org.iplantc.containertype"
@@ -625,6 +629,12 @@ func (d *Docker) CreateDownloadContainer(job *model.Job, input *model.StepInput,
 
 	config.WorkingDir = WORKDIR
 
+	// make sure the host working dir is mounted and make it the default
+	// working dir inside the container.
+	if wd, err = os.Getwd(); err != nil {
+		return "", err
+	}
+
 	// Check to see if a working directory volume exists
 	hasVolume, err := d.VolumeExists(invID)
 	if err != nil {
@@ -638,13 +648,10 @@ func (d *Docker) CreateDownloadContainer(job *model.Job, input *model.StepInput,
 			fmt.Sprintf("%s:%s:%s", invID, WORKDIR, "rw"),
 		)
 	} else {
-		// make sure the host working dir is mounted and make it the default
-		// working dir inside the container.
-		if wd, err = os.Getwd(); err != nil {
-			return "", err
-		}
 		hostConfig.Binds = append(hostConfig.Binds, fmt.Sprintf("%s:%s:%s", wd, WORKDIR, "rw"))
 	}
+
+	hostConfig.Binds = append(hostConfig.Binds, fmt.Sprintf("%s:%s:%s", wd, CONFIGDIR, "rw"))
 
 	config.Labels = make(map[string]string)
 	config.Labels[model.DockerLabelKey] = invID
@@ -721,6 +728,10 @@ func (d *Docker) CreateUploadContainer(job *model.Job) (string, error) {
 
 	config.WorkingDir = WORKDIR
 
+	if wd, err = os.Getwd(); err != nil {
+		return "", err
+	}
+
 	// Check to see if a working directory volume exists
 	hasVolume, err := d.VolumeExists(invID)
 	if err != nil {
@@ -734,12 +745,11 @@ func (d *Docker) CreateUploadContainer(job *model.Job) (string, error) {
 			fmt.Sprintf("%s:%s:%s", invID, WORKDIR, "rw"),
 		)
 	} else {
-		if wd, err = os.Getwd(); err != nil {
-			return "", err
-		}
-
 		hostConfig.Binds = append(hostConfig.Binds, fmt.Sprintf("%s:%s:%s", wd, WORKDIR, "rw"))
 	}
+
+	hostConfig.Binds = append(hostConfig.Binds, fmt.Sprintf("%s:%s:%s", wd, CONFIGDIR, "rw"))
+
 	config.Labels = make(map[string]string)
 	config.Labels[model.DockerLabelKey] = job.InvocationID
 	config.Labels[TypeLabel] = strconv.Itoa(OutputContainer)

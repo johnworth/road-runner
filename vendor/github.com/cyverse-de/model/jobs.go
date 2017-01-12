@@ -167,7 +167,6 @@ func (s *Job) Sanitize() {
 		for j, vf := range step.Component.Container.VolumesFrom {
 			vf.Name = strings.TrimSpace(vf.Name)
 			vf.Tag = strings.TrimSpace(vf.Tag)
-			vf.Name = strings.TrimSpace(vf.Name)
 			vf.NamePrefix = strings.TrimSpace(vf.NamePrefix)
 			vf.HostPath = strings.TrimSpace(vf.HostPath)
 			vf.ContainerPath = strings.TrimSpace(vf.ContainerPath)
@@ -347,7 +346,7 @@ func (s *Job) FinalOutputArguments() []string {
 	retval := []string{
 		"put",
 		"--user", s.Submitter,
-		"--config", "irods-config",
+		"--config", "/configs/irods-config",
 		"--destination", dest,
 	}
 	for _, m := range MetadataArgs(s.FileMetadata).FileMetadataArguments() {
