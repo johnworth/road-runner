@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 
@@ -324,11 +325,28 @@ func pathExists(p string) (bool, error) {
 // CreateWorkingDirVolume creates a new volume that is used to contain the
 // working directory for a job.
 func (d *Docker) CreateWorkingDirVolume(volumeID string) (types.Volume, error) {
+	base := d.cfg.GetString("condor.volumespath")
+	if base == "" {
+		base = "/var/lib/condor/docker-volumes"
+	}
+
+	path := path.Join(base, volumeID)
+
+	if _, err := os.Stat(path); err != nil {
+		if os.IsNotExist(err) {
+			logcabin.Info.Printf("creating volume directory: %s\n", path)
+			if err = os.MkdirAll(path, 0755); err != nil {
+				logcabin.Info.Printf("error creating path %s: %s", path, err)
+				return types.Volume{}, err
+			}
+		}
+	}
+
 	return d.Client.VolumeCreate(d.ctx, volume.VolumesCreateBody{
 		Driver: "local",
 		DriverOpts: map[string]string{
 			"type":   "none",
-			"device": "/tmp/foo",
+			"device": path,
 			"o":      "bind",
 		},
 		Name: volumeID,
