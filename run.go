@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path"
 	"strings"
 	"time"
 
@@ -341,6 +342,25 @@ func Run(client *messaging.Client, dckr *dockerops.Docker, exit chan messaging.S
 		}
 	}
 
+	wd, err := os.Getwd()
+	if err != nil {
+		logcabin.Error.Print(err)
+	} else {
+		voldir := path.Join(wd, dockerops.VOLUMEDIR, "logs")
+		logcabin.Info.Printf("path to the volume directory: %s\n", voldir)
+		err = os.Mkdir(voldir, 0755)
+		if err != nil {
+			logcabin.Error.Print(err)
+		}
+
+		if err = writeJobSummary(voldir, job); err != nil {
+			logcabin.Error.Print(err)
+		}
+
+		if err = writeJobParameters(voldir, job); err != nil {
+			logcabin.Error.Print(err)
+		}
+	}
 	// If pulls didn't succeed then we can't guarantee that we've got the
 	// correct versions of the tools. Don't bother pulling in data in that case,
 	// things are already screwed up.

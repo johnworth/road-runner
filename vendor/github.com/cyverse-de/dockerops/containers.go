@@ -799,19 +799,23 @@ func (d *Docker) CreateUploadContainer(job *model.Job) (string, error) {
 func (d *Docker) UploadOutputs(job *model.Job) (int64, error) {
 	var (
 		err                    error
-		containerID            string
+		wd, containerID        string
 		stdoutFile, stderrFile io.WriteCloser
 	)
 	if containerID, err = d.CreateUploadContainer(job); err != nil {
 		return -1, err
 	}
 
-	if stdoutFile, err = os.Create(path.Join(VOLUMEDIR, "logs/logs-stdout-output")); err != nil {
+	if wd, err = os.Getwd(); err != nil {
+		return -1, err
+	}
+
+	if stdoutFile, err = os.Create(path.Join(wd, VOLUMEDIR, "logs", "logs-stdout-output")); err != nil {
 		return -1, err
 	}
 	defer stdoutFile.Close()
 
-	if stderrFile, err = os.Create(path.Join(VOLUMEDIR, "logs/logs-stderr-output")); err != nil {
+	if stderrFile, err = os.Create(path.Join(wd, VOLUMEDIR, "logs", "logs-stderr-output")); err != nil {
 		return -1, err
 	}
 	defer stderrFile.Close()

@@ -376,6 +376,7 @@ func main() {
 	RegisterStopRequestListener(client, exit, job.InvocationID)
 
 	voldir := path.Join(dockerops.VOLUMEDIR, "logs")
+	logcabin.Info.Printf("path to the volume directory: %s\n", voldir)
 	err = os.Mkdir(voldir, 0755)
 	if err != nil {
 		logcabin.Error.Print(err)
