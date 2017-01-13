@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path"
 	"strings"
 	"time"
 
@@ -337,6 +338,20 @@ func Run(client *messaging.Client, dckr *dockerops.Docker, exit chan messaging.S
 	// // Create the working directory volume
 	if runner.status == messaging.Success {
 		if _, err = runner.dckr.CreateWorkingDirVolume(job.InvocationID); err != nil {
+			logcabin.Error.Print(err)
+		}
+
+		voldir := path.Join(dockerops.VOLUMEDIR, "logs")
+		err = os.Mkdir(voldir, 0755)
+		if err != nil {
+			logcabin.Error.Print(err)
+		}
+
+		if err = writeJobSummary(voldir, job); err != nil {
+			logcabin.Error.Print(err)
+		}
+
+		if err = writeJobParameters(voldir, job); err != nil {
 			logcabin.Error.Print(err)
 		}
 	}

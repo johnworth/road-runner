@@ -375,18 +375,32 @@ func main() {
 
 	RegisterStopRequestListener(client, exit, job.InvocationID)
 
-	err = os.Mkdir("logs", 0755)
+	voldir := path.Join(dockerops.VOLUMEDIR, "logs")
+	err = os.Mkdir(voldir, 0755)
 	if err != nil {
 		logcabin.Error.Print(err)
 	}
 
-	if err = writeJobSummary("logs", job); err != nil {
+	if err = writeJobSummary(voldir, job); err != nil {
 		logcabin.Error.Print(err)
 	}
 
-	if err = writeJobParameters("logs", job); err != nil {
+	if err = writeJobParameters(voldir, job); err != nil {
 		logcabin.Error.Print(err)
 	}
+
+	// err = os.Mkdir("logs", 0755)
+	// if err != nil {
+	// 	logcabin.Error.Print(err)
+	// }
+	//
+	// if err = writeJobSummary("logs", job); err != nil {
+	// 	logcabin.Error.Print(err)
+	// }
+	//
+	// if err = writeJobParameters("logs", job); err != nil {
+	// 	logcabin.Error.Print(err)
+	// }
 
 	go Run(client, dckr, exit)
 

@@ -46,7 +46,7 @@
 			"importpath": "github.com/cyverse-de/dockerops",
 			"repository": "https://github.com/cyverse-de/dockerops",
 			"vcs": "git",
-			"revision": "b521ff5e2d6fb5a4c8d5eded37b3d1c5f5c8a820",
+			"revision": "20ccf3605cc19c6ea1d9741cd5fd455f9cfb780d",
 			"branch": "master",
 			"notests": true
 		},

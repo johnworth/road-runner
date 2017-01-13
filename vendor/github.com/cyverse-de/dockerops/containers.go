@@ -38,6 +38,10 @@ const WORKDIR = "/de-app-work"
 // used to transfer files into and out of the job.
 const CONFIGDIR = "/configs"
 
+// VOLUMEDIR is the name of the directory that is used for the working directory
+// volume.
+const VOLUMEDIR = "workingvolume"
+
 const (
 	// TypeLabel is the label key applied to every container.
 	TypeLabel = "org.iplantc.containertype"
@@ -330,7 +334,7 @@ func (d *Docker) CreateWorkingDirVolume(volumeID string) (types.Volume, error) {
 		return types.Volume{}, err
 	}
 
-	path := path.Join(wd, "workingvolume")
+	path := path.Join(wd, VOLUMEDIR)
 
 	if _, err := os.Stat(path); err != nil {
 		if os.IsNotExist(err) {
