@@ -806,12 +806,12 @@ func (d *Docker) UploadOutputs(job *model.Job) (int64, error) {
 		return -1, err
 	}
 
-	if stdoutFile, err = os.Create("logs/logs-stdout-output"); err != nil {
+	if stdoutFile, err = os.Create(path.Join(VOLUMEDIR, "logs/logs-stdout-output")); err != nil {
 		return -1, err
 	}
 	defer stdoutFile.Close()
 
-	if stderrFile, err = os.Create("logs/logs-stderr-output"); err != nil {
+	if stderrFile, err = os.Create(path.Join(VOLUMEDIR, "logs/logs-stderr-output")); err != nil {
 		return -1, err
 	}
 	defer stderrFile.Close()
