@@ -325,12 +325,12 @@ func pathExists(p string) (bool, error) {
 // CreateWorkingDirVolume creates a new volume that is used to contain the
 // working directory for a job.
 func (d *Docker) CreateWorkingDirVolume(volumeID string) (types.Volume, error) {
-	base := d.cfg.GetString("condor.volumespath")
-	if base == "" {
-		base = "/var/lib/condor/docker-volumes"
+	wd, err := os.Getwd()
+	if err != nil {
+		return types.Volume{}, err
 	}
 
-	path := path.Join(base, volumeID)
+	path := path.Join(wd, "workingvolume")
 
 	if _, err := os.Stat(path); err != nil {
 		if os.IsNotExist(err) {
