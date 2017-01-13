@@ -702,7 +702,7 @@ func (d *Docker) CreateDownloadContainer(job *model.Job, input *model.StepInput,
 func (d *Docker) DownloadInputs(job *model.Job, input *model.StepInput, idx int) (int64, error) {
 	var (
 		err                    error
-		containerID            string
+		wd, containerID        string
 		stdoutFile, stderrFile io.WriteCloser
 	)
 
@@ -712,12 +712,20 @@ func (d *Docker) DownloadInputs(job *model.Job, input *model.StepInput, idx int)
 		return -1, err
 	}
 
-	if stdoutFile, err = os.Create(input.Stdout(inputIdx)); err != nil {
+	if wd, err = os.Getwd(); err != nil {
+		return -1, err
+	}
+
+	stdoutpath := path.Join(wd, VOLUMEDIR, input.Stdout(inputIdx))
+	logcabin.Info.Printf("creating stdout input log at %s\n", stdoutpath)
+	if stdoutFile, err = os.Create(stdoutpath); err != nil {
 		return -1, err
 	}
 	defer stdoutFile.Close()
 
-	if stderrFile, err = os.Create(input.Stderr(inputIdx)); err != nil {
+	stderrpath := path.Join(wd, VOLUMEDIR, input.Stderr(inputIdx))
+	logcabin.Info.Printf("creating stderr input log at %s\n", stderrpath)
+	if stderrFile, err = os.Create(stderrpath); err != nil {
 		return -1, err
 	}
 	defer stderrFile.Close()
@@ -810,12 +818,16 @@ func (d *Docker) UploadOutputs(job *model.Job) (int64, error) {
 		return -1, err
 	}
 
-	if stdoutFile, err = os.Create(path.Join(wd, VOLUMEDIR, "logs", "logs-stdout-output")); err != nil {
+	stdoutpath := path.Join(wd, VOLUMEDIR, "logs", "logs-stdout-output")
+	logcabin.Info.Printf("path to the output stdout file: %s\n", stdoutpath)
+	if stdoutFile, err = os.Create(stdoutpath); err != nil {
 		return -1, err
 	}
 	defer stdoutFile.Close()
 
-	if stderrFile, err = os.Create(path.Join(wd, VOLUMEDIR, "logs", "logs-stderr-output")); err != nil {
+	stderrpath := path.Join(wd, VOLUMEDIR, "logs", "logs-stderr-output")
+	logcabin.Info.Printf("path to the output stderr file: %s\n", stderrpath)
+	if stderrFile, err = os.Create(stderrpath); err != nil {
 		return -1, err
 	}
 	defer stderrFile.Close()
