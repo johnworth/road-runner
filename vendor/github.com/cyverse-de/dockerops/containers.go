@@ -592,8 +592,8 @@ func (d *Docker) ContainerPortMapping(containerID string) (nat.PortMap, error) {
 // return with a non-zero exit code and a non-nil error.
 func (d *Docker) RunStep(step *model.Step, invID string, idx int) (int64, error) {
 	var (
-		err         error
-		containerID string
+		err             error
+		wd, containerID string
 	)
 
 	stepIdx := strconv.Itoa(idx)
@@ -602,13 +602,21 @@ func (d *Docker) RunStep(step *model.Step, invID string, idx int) (int64, error)
 		return -1, err
 	}
 
-	stdoutFile, err := os.Create(step.Stdout(stepIdx))
+	wd, err = os.Getwd()
+	if err != nil {
+		return -1, err
+	}
+	stdoutpath := path.Join(wd, VOLUMEDIR, step.Stdout(stepIdx))
+	logcabin.Info.Printf("path to the step stdout log file: %s\n", stdoutpath)
+	stdoutFile, err := os.Create(stdoutpath)
 	if err != nil {
 		return -1, err
 	}
 	defer stdoutFile.Close()
 
-	stderrFile, err := os.Create(step.Stderr(stepIdx))
+	stderrpath := path.Join(wd, VOLUMEDIR, step.Stderr(stepIdx))
+	logcabin.Info.Printf("path to the step stderr log file: %s\n", stderrpath)
+	stderrFile, err := os.Create(stderrpath)
 	if err != nil {
 		return -1, err
 	}
