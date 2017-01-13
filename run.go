@@ -358,17 +358,6 @@ func Run(client *messaging.Client, dckr *dockerops.Docker, exit chan messaging.S
 		}
 	}
 
-	var hasVolume bool
-	hasVolume, err = runner.dckr.VolumeExists(job.InvocationID)
-	if err != nil {
-		logcabin.Error.Print(err)
-	}
-	if hasVolume {
-		if err = runner.dckr.RemoveVolume(job.InvocationID); err != nil {
-			logcabin.Error.Print(err)
-		}
-	}
-
 	// Always attempt to transfer outputs. There might be logs that can help
 	// debug issues when the job fails.
 	running(runner.client, runner.job, fmt.Sprintf("Beginning to upload outputs to %s", runner.job.OutputDirectory()))

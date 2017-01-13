@@ -51,6 +51,18 @@ func cleanup(job *model.Job) {
 			logcabin.Error.Print(err)
 		}
 	}
+
+	var hasVolume bool
+	hasVolume, err = dckr.VolumeExists(job.InvocationID)
+	if err != nil {
+		logcabin.Error.Print(err)
+	}
+	if hasVolume {
+		logcabin.Info.Printf("removing volume: %s", job.InvocationID)
+		if err = dckr.RemoveVolume(job.InvocationID); err != nil {
+			logcabin.Error.Print(err)
+		}
+	}
 }
 
 // Exit returns a function that can be called by a TimeTracker's Timer, which
@@ -97,6 +109,18 @@ func Exit(exit, finalExit chan messaging.StatusCode) {
 			logcabin.Info.Printf("Nuking container %s", jc)
 			err = dckr.NukeContainer(jc)
 			if err != nil {
+				logcabin.Error.Print(err)
+			}
+		}
+
+		var hasVolume bool
+		hasVolume, err = dckr.VolumeExists(job.InvocationID)
+		if err != nil {
+			logcabin.Error.Print(err)
+		}
+		if hasVolume {
+			logcabin.Info.Printf("removing volume: %s", job.InvocationID)
+			if err = dckr.RemoveVolume(job.InvocationID); err != nil {
 				logcabin.Error.Print(err)
 			}
 		}
