@@ -21,24 +21,23 @@ type JobRunner struct {
 	status messaging.StatusCode
 }
 
-func (r *JobRunner) pullDataImages() error {
+func pullDataImages(dckr *dockerops.Docker, client *messaging.Client, job *model.Job) (messaging.StatusCode, error) {
 	var err error
-	for _, dc := range r.job.DataContainers() {
-		running(r.client, r.job, fmt.Sprintf("Pulling container image %s:%s", dc.Name, dc.Tag))
+	for _, dc := range job.DataContainers() {
+		running(client, job, fmt.Sprintf("Pulling container image %s:%s", dc.Name, dc.Tag))
 		if strings.TrimSpace(dc.Auth) == "" {
-			err = r.dckr.Pull(dc.Name, dc.Tag)
+			err = dckr.Pull(dc.Name, dc.Tag)
 		} else {
-			running(r.client, r.job, fmt.Sprintf("Using auth for pull of %s:%s", dc.Name, dc.Tag))
-			err = r.dckr.PullAuthenticated(dc.Name, dc.Tag, dc.Auth)
+			running(client, job, fmt.Sprintf("Using auth for pull of %s:%s", dc.Name, dc.Tag))
+			err = dckr.PullAuthenticated(dc.Name, dc.Tag, dc.Auth)
 		}
 		if err != nil {
-			r.status = messaging.StatusDockerPullFailed
-			running(r.client, r.job, fmt.Sprintf("Error pulling container image '%s:%s': %s", dc.Name, dc.Tag, err.Error()))
-			return err
+			running(client, job, fmt.Sprintf("Error pulling container image '%s:%s': %s", dc.Name, dc.Tag, err.Error()))
+			return messaging.StatusDockerPullFailed, err
 		}
-		running(r.client, r.job, fmt.Sprintf("Done pulling container image %s:%s", dc.Name, dc.Tag))
+		running(client, job, fmt.Sprintf("Done pulling container image %s:%s", dc.Name, dc.Tag))
 	}
-	return err
+	return messaging.Success, err
 }
 
 func (r *JobRunner) createDataContainers() error {
@@ -213,7 +212,7 @@ func Run(client *messaging.Client, dckr *dockerops.Docker, exit chan messaging.S
 	}
 
 	// Pull the data container images
-	if err = runner.pullDataImages(); err != nil {
+	if runner.status, err = pullDataImages(runner.dckr, runner.client, job); err != nil {
 		logcabin.Error.Print(err)
 	}
 
