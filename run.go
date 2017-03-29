@@ -40,19 +40,18 @@ func pullDataImages(dckr *dockerops.Docker, client *messaging.Client, job *model
 	return messaging.Success, err
 }
 
-func (r *JobRunner) createDataContainers() error {
+func createDataContainers(dckr *dockerops.Docker, client *messaging.Client, job *model.Job) (messaging.StatusCode, error) {
 	var err error
-	for _, dc := range r.job.DataContainers() {
-		running(r.client, r.job, fmt.Sprintf("Creating data container %s-%s", dc.NamePrefix, job.InvocationID))
-		_, err = r.dckr.CreateDataContainer(&dc, r.job.InvocationID)
+	for _, dc := range job.DataContainers() {
+		running(client, job, fmt.Sprintf("Creating data container %s-%s", dc.NamePrefix, job.InvocationID))
+		_, err = dckr.CreateDataContainer(&dc, job.InvocationID)
 		if err != nil {
-			r.status = messaging.StatusDockerPullFailed
-			running(r.client, r.job, fmt.Sprintf("Error creating data container %s-%s", dc.NamePrefix, job.InvocationID))
-			return err
+			running(client, job, fmt.Sprintf("Error creating data container %s-%s", dc.NamePrefix, job.InvocationID))
+			return messaging.StatusDockerPullFailed, err
 		}
-		running(r.client, r.job, fmt.Sprintf("Done creating data container %s-%s", dc.NamePrefix, job.InvocationID))
+		running(client, job, fmt.Sprintf("Done creating data container %s-%s", dc.NamePrefix, job.InvocationID))
 	}
-	return err
+	return messaging.Success, err
 }
 
 func (r *JobRunner) pullStepImages() error {
@@ -218,7 +217,7 @@ func Run(client *messaging.Client, dckr *dockerops.Docker, exit chan messaging.S
 
 	// Create the data containers
 	if runner.status == messaging.Success {
-		if err = runner.createDataContainers(); err != nil {
+		if runner.status, err = createDataContainers(runner.dckr, runner.client, job); err != nil {
 			logcabin.Error.Print(err)
 		}
 	}
