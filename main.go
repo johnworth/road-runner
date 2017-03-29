@@ -21,6 +21,7 @@ import (
 	"github.com/cyverse-de/messaging"
 	"github.com/cyverse-de/model"
 	"github.com/cyverse-de/version"
+	"github.com/streadway/amqp"
 
 	"github.com/spf13/viper"
 )
@@ -159,7 +160,16 @@ func main() {
 
 	go client.Listen()
 
-	RegisterStopRequestListener(client, exit, job.InvocationID)
+	client.AddDeletableConsumer(
+		amqpExchangeName,
+		amqpExchangeType,
+		messaging.StopQueueName(job.InvocationID),
+		messaging.StopRequestKey(job.InvocationID),
+		func(d amqp.Delivery) {
+			d.Ack(false)
+			running(client, job, "Received stop request")
+			exit <- messaging.StatusKilled
+		})
 
 	go Run(client, dckr, exit)
 
