@@ -5,88 +5,12 @@ import (
 	"os"
 	"path"
 	"strings"
-	"time"
 
 	"github.com/cyverse-de/dockerops"
 	"github.com/cyverse-de/logcabin"
 	"github.com/cyverse-de/messaging"
 	"github.com/cyverse-de/model"
 )
-
-// The cancellation buffer is the time between the job cancellation warning message and
-// the time that the job is actually canceled. The buffer is 20% of the total allotted
-// minutes. If the allotted job run time is less than thirty seconds then no warning
-// message will be sent.
-const cancellationBufferFactor = float64(0.2)
-const minCancellationBuffer = 30 * time.Second
-const maxCancellationBuffer = 5 * time.Minute
-const cancellationBufferThreshold = 2 * minCancellationBuffer
-
-func determineCancellationWarningBuffer(jobDuration time.Duration) time.Duration {
-
-	// Don't bother with a cancellation warning if the allotted run time is too short.
-	if jobDuration < cancellationBufferThreshold {
-		return 0
-	}
-
-	// Determine how long before the allotted job cancellation time we should send the warning.
-	buffer := time.Duration(float64(jobDuration) * cancellationBufferFactor)
-	if buffer < minCancellationBuffer {
-		return minCancellationBuffer
-	} else if buffer > maxCancellationBuffer {
-		return maxCancellationBuffer
-	} else {
-		return buffer
-	}
-}
-
-func (r *JobRunner) getTicker(timeLimit int, exit chan messaging.StatusCode) (chan int, error) {
-	if timeLimit <= 0 {
-		return nil, fmt.Errorf("TimeLimit was %d instead of > 0", timeLimit)
-	}
-
-	// Determine the step duration.
-	stepDuration := time.Duration(timeLimit) * time.Second
-
-	// Create a job cancellation warning ticker if the job length isn't too short.
-	var warnTicker *time.Ticker
-	cancellationWarningBuffer := determineCancellationWarningBuffer(stepDuration)
-	if cancellationWarningBuffer > 0 {
-		warnTicker = time.NewTicker(stepDuration - cancellationWarningBuffer)
-	}
-
-	// Create the cancellation ticker and a channel to accept a command to stop the tickers.
-	stepTicker := time.NewTicker(stepDuration)
-	quitTicker := make(chan int)
-
-	go func(stepTicker *time.Ticker) {
-		_ = <-stepTicker.C
-		logcabin.Info.Print("ticker received message to exit")
-		exit <- messaging.StatusTimeLimit
-	}(stepTicker)
-
-	if warnTicker != nil {
-		go func(warnTicker *time.Ticker, cancellationWarningBuffer time.Duration) {
-			_ = <-warnTicker.C
-			logcabin.Info.Print("ticker received message to warn user of impending cancellation")
-			impendingCancellation(r.client, r.job, fmt.Sprintf(
-				"Job will be canceled if the current step does not complete in %s",
-				cancellationWarningBuffer.String(),
-			))
-		}(warnTicker, cancellationWarningBuffer)
-	}
-
-	go func(stepTicker, warnTicker *time.Ticker, quitTicker chan int) {
-		_ = <-quitTicker
-		stepTicker.Stop()
-		if warnTicker != nil {
-			warnTicker.Stop()
-		}
-		logcabin.Info.Print("received message to stop tickers")
-	}(stepTicker, warnTicker, quitTicker)
-
-	return quitTicker, nil
-}
 
 // JobRunner provides the functionality needed to run jobs.
 type JobRunner struct {
@@ -188,35 +112,7 @@ func (r *JobRunner) runAllSteps(exit chan messaging.StatusCode) error {
 
 		step.Environment["IPLANT_USER"] = job.Submitter
 		step.Environment["IPLANT_EXECUTION_ID"] = job.InvocationID
-
-		// TimeLimits set to 0 mean that there isn't a time limit.
-		var timeLimitEnabled bool
-		if step.Component.TimeLimit > 0 {
-			logcabin.Info.Printf("Time limit is set to %d", step.Component.TimeLimit)
-			timeLimitEnabled = true
-		} else {
-			logcabin.Info.Print("time limit is disabled")
-		}
-
-		// Start up the ticker
-		var tickerQuit chan int
-		if timeLimitEnabled {
-			tickerQuit, err = r.getTicker(step.Component.TimeLimit, exit)
-			if err != nil {
-				logcabin.Error.Print(err)
-				timeLimitEnabled = false
-			} else {
-				logcabin.Info.Print("started up time limit ticker")
-			}
-		}
-
 		exitCode, err = dckr.RunStep(&step, r.job.InvocationID, idx)
-
-		// Shut down the ticker
-		if timeLimitEnabled {
-			tickerQuit <- 1
-			logcabin.Info.Print("sent message to stop time limit ticker")
-		}
 
 		if exitCode != 0 || err != nil {
 			if err != nil {

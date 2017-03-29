@@ -6,7 +6,6 @@ import (
 	"os"
 	"path"
 	"testing"
-	"time"
 
 	"github.com/cyverse-de/configurate"
 	"github.com/cyverse-de/messaging"
@@ -136,48 +135,5 @@ func TestDeleteJobFile(t *testing.T) {
 	tmpPath := path.Join(to, fmt.Sprintf("%s.json", uuid))
 	if _, err := os.Open(tmpPath); err == nil {
 		t.Errorf("tmpPath %s existed after deleteJobFile() was called", tmpPath)
-	}
-}
-
-func TestJobWithoutCancellationWarning(t *testing.T) {
-	if determineCancellationWarningBuffer(59*time.Second) != 0 {
-		t.Error("A timeout warning message would be produced when it shouldn't")
-	}
-}
-
-func TestJobWithMinimumWarningBuffer(t *testing.T) {
-	cancellationWarningBuffer := determineCancellationWarningBuffer(61 * time.Second)
-	if cancellationWarningBuffer == 0 {
-		t.Error("A timeout warning would" +
-			" not be produced when it should")
-	} else if cancellationWarningBuffer != minCancellationBuffer {
-		t.Errorf(
-			"Unexpected duration between cancellation warning and job cancellation: %s",
-			cancellationWarningBuffer.String(),
-		)
-	}
-}
-
-func TestJobWithDefaultWarningBuffer(t *testing.T) {
-	cancellationWarningBuffer := determineCancellationWarningBuffer(500 * time.Second)
-	if cancellationWarningBuffer == 0 {
-		t.Error("A timeout warning would not be produced when it should")
-	} else if cancellationWarningBuffer != 100*time.Second {
-		t.Errorf(
-			"Unexpected duration between cancellation warning and job cancellation: %s",
-			cancellationWarningBuffer.String(),
-		)
-	}
-}
-
-func TestJobWithMaximumWarningBuffer(t *testing.T) {
-	cancellationWarningBuffer := determineCancellationWarningBuffer(30 * time.Minute)
-	if cancellationWarningBuffer == 0 {
-		t.Error("A timeout warning would not be produced when it should")
-	} else if cancellationWarningBuffer != maxCancellationBuffer {
-		t.Errorf(
-			"Unexpected duration between cancellation warning and job cancellation: %s",
-			cancellationWarningBuffer.String(),
-		)
 	}
 }
