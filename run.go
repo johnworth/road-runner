@@ -54,24 +54,23 @@ func createDataContainers(dckr *dockerops.Docker, client *messaging.Client, job 
 	return messaging.Success, err
 }
 
-func (r *JobRunner) pullStepImages() error {
+func pullStepImages(dckr *dockerops.Docker, client *messaging.Client, job *model.Job) (messaging.StatusCode, error) {
 	var err error
-	for _, ci := range r.job.ContainerImages() {
-		running(r.client, r.job, fmt.Sprintf("Pulling tool container %s:%s", ci.Name, ci.Tag))
+	for _, ci := range job.ContainerImages() {
+		running(client, job, fmt.Sprintf("Pulling tool container %s:%s", ci.Name, ci.Tag))
 		if strings.TrimSpace(ci.Auth) == "" {
-			err = r.dckr.Pull(ci.Name, ci.Tag)
+			err = dckr.Pull(ci.Name, ci.Tag)
 		} else {
-			running(r.client, r.job, fmt.Sprintf("Using auth for pull of %s:%s", ci.Name, ci.Tag))
-			err = r.dckr.PullAuthenticated(ci.Name, ci.Tag, ci.Auth)
+			running(client, job, fmt.Sprintf("Using auth for pull of %s:%s", ci.Name, ci.Tag))
+			err = dckr.PullAuthenticated(ci.Name, ci.Tag, ci.Auth)
 		}
 		if err != nil {
-			r.status = messaging.StatusDockerPullFailed
-			running(r.client, r.job, fmt.Sprintf("Error pulling tool container '%s:%s': %s", ci.Name, ci.Tag, err.Error()))
-			return err
+			running(client, job, fmt.Sprintf("Error pulling tool container '%s:%s': %s", ci.Name, ci.Tag, err.Error()))
+			return messaging.StatusDockerPullFailed, err
 		}
-		running(r.client, r.job, fmt.Sprintf("Done pulling tool container %s:%s", ci.Name, ci.Tag))
+		running(client, job, fmt.Sprintf("Done pulling tool container %s:%s", ci.Name, ci.Tag))
 	}
-	return err
+	return messaging.Success, err
 }
 
 func (r *JobRunner) downloadInputs() error {
@@ -224,7 +223,7 @@ func Run(client *messaging.Client, dckr *dockerops.Docker, exit chan messaging.S
 
 	// Pull the job step containers
 	if runner.status == messaging.Success {
-		if err = runner.pullStepImages(); err != nil {
+		if runner.status, err = pullStepImages(runner.dckr, runner.client, job); err != nil {
 			logcabin.Error.Print(err)
 		}
 	}
