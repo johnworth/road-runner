@@ -92,12 +92,12 @@ func downloadInputs(dckr *dockerops.Docker, client *messaging.Client, job *model
 	return messaging.Success, err
 }
 
-func (r *JobRunner) runAllSteps(exit chan messaging.StatusCode) error {
+func runAllSteps(dckr *dockerops.Docker, client *messaging.Client, job *model.Job, exit chan messaging.StatusCode) (messaging.StatusCode, error) {
 	var err error
 	var exitCode int64
 
-	for idx, step := range r.job.Steps {
-		running(r.client, r.job,
+	for idx, step := range job.Steps {
+		running(client, job,
 			fmt.Sprintf(
 				"Running tool container %s:%s with arguments: %s",
 				step.Component.Container.Image.Name,
@@ -108,11 +108,11 @@ func (r *JobRunner) runAllSteps(exit chan messaging.StatusCode) error {
 
 		step.Environment["IPLANT_USER"] = job.Submitter
 		step.Environment["IPLANT_EXECUTION_ID"] = job.InvocationID
-		exitCode, err = dckr.RunStep(&step, r.job.InvocationID, idx)
+		exitCode, err = dckr.RunStep(&step, job.InvocationID, idx)
 
 		if exitCode != 0 || err != nil {
 			if err != nil {
-				running(r.client, r.job,
+				running(client, job,
 					fmt.Sprintf(
 						"Error running tool container %s:%s with arguments '%s': %s",
 						step.Component.Container.Image.Name,
@@ -129,12 +129,11 @@ func (r *JobRunner) runAllSteps(exit chan messaging.StatusCode) error {
 					strings.Join(step.Arguments(), " "),
 					exitCode,
 				)
-				running(r.client, r.job, err.Error())
+				running(client, job, err.Error())
 			}
-			r.status = messaging.StatusStepFailed
-			return err
+			return messaging.StatusStepFailed, err
 		}
-		running(r.client, r.job,
+		running(client, job,
 			fmt.Sprintf("Tool container %s:%s with arguments '%s' finished successfully",
 				step.Component.Container.Image.Name,
 				step.Component.Container.Image.Tag,
@@ -142,35 +141,32 @@ func (r *JobRunner) runAllSteps(exit chan messaging.StatusCode) error {
 			),
 		)
 	}
-	return err
+	return messaging.Success, err
 }
 
-func (r *JobRunner) uploadOutputs() error {
+func uploadOutputs(dckr *dockerops.Docker, client *messaging.Client, job *model.Job) (messaging.StatusCode, error) {
 	var (
 		err      error
 		exitCode int64
 	)
-
-	exitCode, err = dckr.UploadOutputs(r.job)
+	exitCode, err = dckr.UploadOutputs(job)
 	if exitCode != 0 || err != nil {
 		if err != nil {
-			running(r.client, r.job, fmt.Sprintf("Error uploading outputs to %s: %s", r.job.OutputDirectory(), err.Error()))
-		} else {
-			if r.client == nil {
-				logcabin.Warning.Println("client is nil")
-			}
-			if r.job == nil {
-				logcabin.Warning.Println("job is nil")
-			}
-			od := r.job.OutputDirectory()
-			running(r.client, r.job, fmt.Sprintf("Transfer utility exited with a code of %d when uploading outputs to %s", exitCode, od))
+			running(client, job, fmt.Sprintf("Error uploading outputs to %s: %s", job.OutputDirectory(), err.Error()))
+			return messaging.StatusOutputFailed, err
 		}
-		r.status = messaging.StatusOutputFailed
+		if client == nil {
+			logcabin.Warning.Println("client is nil")
+		}
+		if job == nil {
+			logcabin.Warning.Println("job is nil")
+		}
+		od := job.OutputDirectory()
+		running(client, job, fmt.Sprintf("Transfer utility exited with a code of %d when uploading outputs to %s", exitCode, od))
+		return messaging.StatusOutputFailed, fmt.Errorf("exit code from uploader was %d", exitCode)
 	}
-
-	running(r.client, r.job, fmt.Sprintf("Done uploading outputs to %s", r.job.OutputDirectory()))
-
-	return err
+	running(client, job, fmt.Sprintf("Done uploading outputs to %s", job.OutputDirectory()))
+	return messaging.Success, err
 }
 
 // Run executes the job, and returns the exit code on the exit channel.
@@ -265,7 +261,7 @@ func Run(client *messaging.Client, dckr *dockerops.Docker, exit chan messaging.S
 	// Only attempt to run the steps if the input downloads succeeded. No reason
 	// to run the steps if there's no/corrupted data to operate on.
 	if runner.status == messaging.Success {
-		if err = runner.runAllSteps(exit); err != nil {
+		if runner.status, err = runAllSteps(runner.dckr, runner.client, job, exit); err != nil {
 			logcabin.Error.Print(err)
 		}
 	}
@@ -273,7 +269,7 @@ func Run(client *messaging.Client, dckr *dockerops.Docker, exit chan messaging.S
 	// Always attempt to transfer outputs. There might be logs that can help
 	// debug issues when the job fails.
 	running(runner.client, runner.job, fmt.Sprintf("Beginning to upload outputs to %s", runner.job.OutputDirectory()))
-	if err = runner.uploadOutputs(); err != nil {
+	if runner.status, err = uploadOutputs(runner.dckr, runner.client, job); err != nil {
 		logcabin.Error.Print(err)
 	}
 
