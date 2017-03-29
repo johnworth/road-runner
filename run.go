@@ -73,24 +73,23 @@ func pullStepImages(dckr *dockerops.Docker, client *messaging.Client, job *model
 	return messaging.Success, err
 }
 
-func (r *JobRunner) downloadInputs() error {
+func downloadInputs(dckr *dockerops.Docker, client *messaging.Client, job *model.Job) (messaging.StatusCode, error) {
 	var err error
 	var exitCode int64
-	for idx, input := range r.job.Inputs() {
-		running(r.client, r.job, fmt.Sprintf("Downloading %s", input.IRODSPath()))
-		exitCode, err = dckr.DownloadInputs(r.job, &input, idx)
+	for idx, input := range job.Inputs() {
+		running(client, job, fmt.Sprintf("Downloading %s", input.IRODSPath()))
+		exitCode, err = dckr.DownloadInputs(job, &input, idx)
 		if exitCode != 0 || err != nil {
 			if err != nil {
-				running(r.client, r.job, fmt.Sprintf("Error downloading %s: %s", input.IRODSPath(), err.Error()))
+				running(client, job, fmt.Sprintf("Error downloading %s: %s", input.IRODSPath(), err.Error()))
 			} else {
-				running(r.client, r.job, fmt.Sprintf("Error downloading %s: Transfer utility exited with %d", input.IRODSPath(), exitCode))
+				running(client, job, fmt.Sprintf("Error downloading %s: Transfer utility exited with %d", input.IRODSPath(), exitCode))
 			}
-			r.status = messaging.StatusInputFailed
-			return err
+			return messaging.StatusInputFailed, err
 		}
-		running(r.client, r.job, fmt.Sprintf("Finished downloading %s", input.IRODSPath()))
+		running(client, job, fmt.Sprintf("Finished downloading %s", input.IRODSPath()))
 	}
-	return err
+	return messaging.Success, err
 }
 
 func (r *JobRunner) runAllSteps(exit chan messaging.StatusCode) error {
@@ -258,7 +257,7 @@ func Run(client *messaging.Client, dckr *dockerops.Docker, exit chan messaging.S
 	// correct versions of the tools. Don't bother pulling in data in that case,
 	// things are already screwed up.
 	if runner.status == messaging.Success {
-		if err = runner.downloadInputs(); err != nil {
+		if runner.status, err = downloadInputs(runner.dckr, runner.client, job); err != nil {
 			logcabin.Error.Print(err)
 		}
 	}
