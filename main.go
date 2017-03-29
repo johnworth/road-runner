@@ -8,17 +8,12 @@ package main
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
 	"os/signal"
-	"path"
 	"syscall"
-	"time"
 
 	"github.com/cyverse-de/configurate"
 	"github.com/cyverse-de/dockerops"
@@ -26,7 +21,6 @@ import (
 	"github.com/cyverse-de/messaging"
 	"github.com/cyverse-de/model"
 	"github.com/cyverse-de/version"
-	"github.com/streadway/amqp"
 
 	"github.com/spf13/viper"
 )
@@ -38,214 +32,6 @@ var (
 	amqpExchangeName string
 	amqpExchangeType string
 )
-
-func hostname() string {
-	h, err := os.Hostname()
-	if err != nil {
-		logcabin.Error.Printf("Couldn't get the hostname: %s", err.Error())
-		return ""
-	}
-	return h
-}
-
-func fail(client *messaging.Client, job *model.Job, msg string) error {
-	logcabin.Error.Print(msg)
-	return client.PublishJobUpdate(&messaging.UpdateMessage{
-		Job:     job,
-		State:   messaging.FailedState,
-		Message: msg,
-		Sender:  hostname(),
-	})
-}
-
-func success(client *messaging.Client, job *model.Job) error {
-	logcabin.Info.Print("Job success")
-	return client.PublishJobUpdate(&messaging.UpdateMessage{
-		Job:    job,
-		State:  messaging.SucceededState,
-		Sender: hostname(),
-	})
-}
-
-func running(client *messaging.Client, job *model.Job, msg string) {
-	err := client.PublishJobUpdate(&messaging.UpdateMessage{
-		Job:     job,
-		State:   messaging.RunningState,
-		Message: msg,
-		Sender:  hostname(),
-	})
-	if err != nil {
-		logcabin.Error.Print(err)
-	}
-	logcabin.Info.Print(msg)
-}
-
-func impendingCancellation(client *messaging.Client, job *model.Job, msg string) {
-	err := client.PublishJobUpdate(&messaging.UpdateMessage{
-		Job:     job,
-		State:   messaging.ImpendingCancellationState,
-		Message: msg,
-		Sender:  hostname(),
-	})
-	if err != nil {
-		logcabin.Error.Print(err)
-	}
-	logcabin.Info.Print(msg)
-}
-
-// TimeTracker tracks when road-runner should exit.
-type TimeTracker struct {
-	Timer   *time.Timer
-	EndDate time.Time
-}
-
-// NewTimeTracker returns a new *TimeTracker.
-func NewTimeTracker(d time.Duration, exitFunc func()) *TimeTracker {
-	endDate := time.Now().Add(d)
-	exitTimer := time.AfterFunc(d, exitFunc)
-	return &TimeTracker{
-		EndDate: endDate,
-		Timer:   exitTimer,
-	}
-}
-
-// ApplyDelta generates a new end date and modifies the time with the passed-in
-// duration.
-func (t *TimeTracker) ApplyDelta(deltaDuration time.Duration) error {
-	//apply the new duration to the current end date.
-	newEndDate := t.EndDate.Add(deltaDuration)
-
-	//create a new duration that is the difference between the new end date and now.
-	newDuration := t.EndDate.Sub(time.Now())
-
-	//modify the Timer to use the new duration.
-	wasActive := t.Timer.Reset(newDuration)
-
-	//set the new enddate
-	t.EndDate = newEndDate
-
-	if !wasActive {
-		return errors.New("Timer was not active")
-	}
-	return nil
-}
-
-// RegisterTimeLimitDeltaListener sets a function that listens for TimeLimitDelta
-// messages on the given client.
-func RegisterTimeLimitDeltaListener(client *messaging.Client, timeTracker *TimeTracker, invID string) {
-	client.AddDeletableConsumer(
-		amqpExchangeName,
-		amqpExchangeType,
-		messaging.TimeLimitDeltaQueueName(invID),
-		messaging.TimeLimitDeltaRequestKey(invID),
-		func(d amqp.Delivery) {
-			d.Ack(false)
-
-			running(client, job, "Received delta request")
-
-			deltaMsg := &messaging.TimeLimitDelta{}
-			err := json.Unmarshal(d.Body, deltaMsg)
-			if err != nil {
-				running(client, job, fmt.Sprintf("Failed to unmarshal time limit delta: %s", err.Error()))
-				return
-			}
-
-			newDuration, err := time.ParseDuration(deltaMsg.Delta)
-			if err != nil {
-				running(client, job, fmt.Sprintf("Failed to parse duration string from message: %s", err.Error()))
-				return
-			}
-
-			err = timeTracker.ApplyDelta(newDuration)
-			if err != nil {
-				running(client, job, fmt.Sprintf("Failed to apply time limit delta: %s", err.Error()))
-				return
-			}
-
-			running(client, job, fmt.Sprintf("Applied time delta of %s. New end date is %s", deltaMsg.Delta, timeTracker.EndDate.UTC().String()))
-		})
-}
-
-// RegisterTimeLimitRequestListener sets a function that listens for
-// TimeLimitRequest messages on the given client.
-func RegisterTimeLimitRequestListener(client *messaging.Client, timeTracker *TimeTracker, invID string) {
-	client.AddDeletableConsumer(
-		amqpExchangeName,
-		amqpExchangeType,
-		messaging.TimeLimitRequestQueueName(invID),
-		messaging.TimeLimitRequestKey(invID),
-		func(d amqp.Delivery) {
-			d.Ack(false)
-
-			running(client, job, "Received time limit request")
-
-			timeLeft := int64(timeTracker.EndDate.Sub(time.Now())) / int64(time.Millisecond)
-			err := client.SendTimeLimitResponse(invID, timeLeft)
-			if err != nil {
-				running(client, job, fmt.Sprintf("Failed to send time limit response: %s", err.Error()))
-				return
-			}
-
-			running(client, job, fmt.Sprintf("Sent message saying that time left is %dms", timeLeft))
-		})
-}
-
-// RegisterTimeLimitResponseListener sets a function that handles messages that
-// are sent on the jobs exchange with the key for time limit responses. This
-// service doesn't need these messages, this is just here to force the queue
-// to get cleaned up when road-runner exits.
-func RegisterTimeLimitResponseListener(client *messaging.Client, invID string) {
-	client.AddDeletableConsumer(
-		amqpExchangeName,
-		amqpExchangeType,
-		messaging.TimeLimitResponsesQueueName(invID),
-		messaging.TimeLimitResponsesKey(invID),
-		func(d amqp.Delivery) {
-			d.Ack(false)
-			logcabin.Info.Print(string(d.Body))
-		})
-}
-
-// RegisterStopRequestListener sets a function that responses to StopRequest
-// messages.
-func RegisterStopRequestListener(client *messaging.Client, exit chan messaging.StatusCode, invID string) {
-	client.AddDeletableConsumer(
-		amqpExchangeName,
-		amqpExchangeType,
-		messaging.StopQueueName(invID),
-		messaging.StopRequestKey(invID),
-		func(d amqp.Delivery) {
-			d.Ack(false)
-			running(client, job, "Received stop request")
-			exit <- messaging.StatusKilled
-		})
-}
-
-func copyJobFile(uuid, from, toDir string) error {
-	inputReader, err := os.Open(from)
-	if err != nil {
-		return err
-	}
-
-	outputFilePath := path.Join(toDir, fmt.Sprintf("%s.json", uuid))
-	outputWriter, err := os.Create(outputFilePath)
-	if err != nil {
-		return err
-	}
-
-	if _, err := io.Copy(outputWriter, inputReader); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func deleteJobFile(uuid, toDir string) {
-	filePath := path.Join(toDir, fmt.Sprintf("%s.json", uuid))
-	if err := os.Remove(filePath); err != nil {
-		logcabin.Error.Print(err)
-	}
-}
 
 func main() {
 	logcabin.Init("road-runner", "road-runner")
