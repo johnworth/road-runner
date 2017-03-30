@@ -175,7 +175,9 @@ func main() {
 
 	exitCode := <-finalExit
 
-	deleteJobFile(job.InvocationID, *writeTo)
+	if err = deleteJobFile(job.InvocationID, *writeTo); err != nil {
+		logcabin.Error.Printf("%+v", err)
+	}
 
 	os.Exit(int(exitCode))
 }
