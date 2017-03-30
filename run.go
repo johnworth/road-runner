@@ -10,6 +10,7 @@ import (
 	"github.com/cyverse-de/logcabin"
 	"github.com/cyverse-de/messaging"
 	"github.com/cyverse-de/model"
+	"github.com/pkg/errors"
 )
 
 // JobRunner provides the functionality needed to run jobs.
@@ -33,11 +34,11 @@ func pullDataImages(dckr *dockerops.Docker, client *messaging.Client, job *model
 		}
 		if err != nil {
 			running(client, job, fmt.Sprintf("Error pulling container image '%s:%s': %s", dc.Name, dc.Tag, err.Error()))
-			return messaging.StatusDockerPullFailed, err
+			return messaging.StatusDockerPullFailed, errors.Wrapf(err, "failed to pull data image %s:%s", dc.Name, dc.Tag)
 		}
 		running(client, job, fmt.Sprintf("Done pulling container image %s:%s", dc.Name, dc.Tag))
 	}
-	return messaging.Success, err
+	return messaging.Success, nil
 }
 
 func createDataContainers(dckr *dockerops.Docker, client *messaging.Client, job *model.Job) (messaging.StatusCode, error) {
@@ -47,11 +48,11 @@ func createDataContainers(dckr *dockerops.Docker, client *messaging.Client, job 
 		_, err = dckr.CreateDataContainer(&dc, job.InvocationID)
 		if err != nil {
 			running(client, job, fmt.Sprintf("Error creating data container %s-%s", dc.NamePrefix, job.InvocationID))
-			return messaging.StatusDockerPullFailed, err
+			return messaging.StatusDockerPullFailed, errors.Wrapf(err, "failed to create data container %s-%s", dc.NamePrefix, job.InvocationID)
 		}
 		running(client, job, fmt.Sprintf("Done creating data container %s-%s", dc.NamePrefix, job.InvocationID))
 	}
-	return messaging.Success, err
+	return messaging.Success, nil
 }
 
 func pullStepImages(dckr *dockerops.Docker, client *messaging.Client, job *model.Job) (messaging.StatusCode, error) {
@@ -66,11 +67,11 @@ func pullStepImages(dckr *dockerops.Docker, client *messaging.Client, job *model
 		}
 		if err != nil {
 			running(client, job, fmt.Sprintf("Error pulling tool container '%s:%s': %s", ci.Name, ci.Tag, err.Error()))
-			return messaging.StatusDockerPullFailed, err
+			return messaging.StatusDockerPullFailed, errors.Wrapf(err, "failed to pull tool image %s:%s", ci.Name, ci.Tag)
 		}
 		running(client, job, fmt.Sprintf("Done pulling tool container %s:%s", ci.Name, ci.Tag))
 	}
-	return messaging.Success, err
+	return messaging.Success, nil
 }
 
 func downloadInputs(dckr *dockerops.Docker, client *messaging.Client, job *model.Job) (messaging.StatusCode, error) {
@@ -85,11 +86,11 @@ func downloadInputs(dckr *dockerops.Docker, client *messaging.Client, job *model
 			} else {
 				running(client, job, fmt.Sprintf("Error downloading %s: Transfer utility exited with %d", input.IRODSPath(), exitCode))
 			}
-			return messaging.StatusInputFailed, err
+			return messaging.StatusInputFailed, errors.Wrapf(err, "failed to download %s with an exit code of %d", input.IRODSPath(), exitCode)
 		}
 		running(client, job, fmt.Sprintf("Finished downloading %s", input.IRODSPath()))
 	}
-	return messaging.Success, err
+	return messaging.Success, nil
 }
 
 func runAllSteps(dckr *dockerops.Docker, client *messaging.Client, job *model.Job, exit chan messaging.StatusCode) (messaging.StatusCode, error) {
@@ -153,7 +154,7 @@ func uploadOutputs(dckr *dockerops.Docker, client *messaging.Client, job *model.
 	if exitCode != 0 || err != nil {
 		if err != nil {
 			running(client, job, fmt.Sprintf("Error uploading outputs to %s: %s", job.OutputDirectory(), err.Error()))
-			return messaging.StatusOutputFailed, err
+			return messaging.StatusOutputFailed, errors.Wrapf(err, "failed to upload outputs to %s", job.OutputDirectory())
 		}
 		if client == nil {
 			logcabin.Warning.Println("client is nil")
@@ -163,10 +164,10 @@ func uploadOutputs(dckr *dockerops.Docker, client *messaging.Client, job *model.
 		}
 		od := job.OutputDirectory()
 		running(client, job, fmt.Sprintf("Transfer utility exited with a code of %d when uploading outputs to %s", exitCode, od))
-		return messaging.StatusOutputFailed, fmt.Errorf("exit code from uploader was %d", exitCode)
+		return messaging.StatusOutputFailed, errors.Wrapf(err, "failed to upload outputs with exit code %d", exitCode)
 	}
 	running(client, job, fmt.Sprintf("Done uploading outputs to %s", job.OutputDirectory()))
-	return messaging.Success, err
+	return messaging.Success, nil
 }
 
 // Run executes the job, and returns the exit code on the exit channel.
