@@ -47,11 +47,8 @@ func init() {
 
 func main() {
 	logcabin.Init("road-runner", "road-runner")
-
 	sigquitter := make(chan bool)
-
 	sighandler := InitSignalHandler()
-
 	sighandler.Receive(
 		sigquitter,
 		func(sig os.Signal) {
@@ -79,7 +76,6 @@ func main() {
 			log.Info("Signal handler is quitting")
 		},
 	)
-
 	signal.Notify(
 		sighandler.Signals,
 		os.Interrupt,
@@ -88,7 +84,6 @@ func main() {
 		syscall.SIGSTOP,
 		syscall.SIGQUIT,
 	)
-
 	var (
 		showVersion = flag.Bool("version", false, "Print the version information")
 		jobFile     = flag.String("job", "", "The path to the job description file")
@@ -98,18 +93,14 @@ func main() {
 		err         error
 		cfg         *viper.Viper
 	)
-
 	flag.Parse()
-
 	if *showVersion {
 		version.AppVersion()
 		os.Exit(0)
 	}
-
 	if *cfgPath == "" {
 		log.Fatal("--config must be set.")
 	}
-
 	log.Infof("Reading config from %s\n", *cfgPath)
 	if _, err = os.Open(*cfgPath); err != nil {
 		log.Fatal(*cfgPath)
@@ -119,58 +110,44 @@ func main() {
 		log.Fatal(err)
 	}
 	log.Infof("Done reading config from %s\n", *cfgPath)
-
 	if *jobFile == "" {
 		log.Fatal("--job must be set.")
 	}
-
 	data, err := ioutil.ReadFile(*jobFile)
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	job, err = model.NewFromData(cfg, data)
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	if _, err = os.Open(*writeTo); err != nil {
 		log.Fatal(err)
 	}
-
 	if err = copyJobFile(job.InvocationID, *jobFile, *writeTo); err != nil {
 		log.Fatal(err)
 	}
-
 	uri := cfg.GetString("amqp.uri")
 	amqpExchangeName = cfg.GetString("amqp.exchange.name")
 	amqpExchangeType = cfg.GetString("amqp.exchange.type")
-
 	client, err = messaging.NewClient(uri, true)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer client.Close()
-
 	client.SetupPublishing(amqpExchangeName)
-
 	dckr, err = dockerops.NewDocker(context.Background(), cfg, *dockerURI)
 	if err != nil {
 		fail(client, job, "Failed to connect to local docker socket")
 		log.Fatal(err)
 	}
-
 	// The channel that the exit code will be passed along on.
 	exit := make(chan messaging.StatusCode)
-
 	// Could probably reuse the exit channel, but that's less explicit.
 	finalExit := make(chan messaging.StatusCode)
-
 	// Launch the go routine that will handle job exits by signal or timer.
 	go Exit(exit, finalExit)
-
 	go client.Listen()
-
 	client.AddDeletableConsumer(
 		amqpExchangeName,
 		amqpExchangeType,
@@ -181,14 +158,10 @@ func main() {
 			running(client, job, "Received stop request")
 			exit <- messaging.StatusKilled
 		})
-
 	go Run(client, dckr, exit)
-
 	exitCode := <-finalExit
-
 	if err = deleteJobFile(job.InvocationID, *writeTo); err != nil {
 		log.Errorf("%+v", err)
 	}
-
 	os.Exit(int(exitCode))
 }
