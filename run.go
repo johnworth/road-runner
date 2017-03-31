@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/cyverse-de/dockerops"
-	"github.com/cyverse-de/logcabin"
 	"github.com/cyverse-de/messaging"
 	"github.com/cyverse-de/model"
 	"github.com/pkg/errors"
@@ -157,10 +156,10 @@ func uploadOutputs(dckr *dockerops.Docker, client *messaging.Client, job *model.
 			return messaging.StatusOutputFailed, errors.Wrapf(err, "failed to upload outputs to %s", job.OutputDirectory())
 		}
 		if client == nil {
-			logcabin.Warning.Println("client is nil")
+			log.Warnln("client is nil")
 		}
 		if job == nil {
-			logcabin.Warning.Println("job is nil")
+			log.Warnln("job is nil")
 		}
 		od := job.OutputDirectory()
 		running(client, job, fmt.Sprintf("Transfer utility exited with a code of %d when uploading outputs to %s", exitCode, od))
@@ -182,7 +181,7 @@ func Run(client *messaging.Client, dckr *dockerops.Docker, exit chan messaging.S
 
 	host, err := os.Hostname()
 	if err != nil {
-		logcabin.Error.Print(err)
+		log.Error(err)
 		host = "UNKNOWN"
 	}
 
@@ -191,63 +190,63 @@ func Run(client *messaging.Client, dckr *dockerops.Docker, exit chan messaging.S
 
 	transferTrigger, err := os.Create("logs/de-transfer-trigger.log")
 	if err != nil {
-		logcabin.Error.Print(err)
+		log.Error(err)
 	} else {
 		_, err = transferTrigger.WriteString("This is only used to force HTCondor to transfer files.")
 		if err != nil {
-			logcabin.Error.Print(err)
+			log.Error(err)
 		}
 	}
 
 	if _, err = os.Stat("iplant.cmd"); err != nil {
 		if err = os.Rename("iplant.cmd", "logs/iplant.cmd"); err != nil {
-			logcabin.Error.Print(err)
+			log.Error(err)
 		}
 	}
 
 	// Pull the data container images
 	if runner.status, err = pullDataImages(runner.dckr, runner.client, job); err != nil {
-		logcabin.Error.Print(err)
+		log.Error(err)
 	}
 
 	// Create the data containers
 	if runner.status == messaging.Success {
 		if runner.status, err = createDataContainers(runner.dckr, runner.client, job); err != nil {
-			logcabin.Error.Print(err)
+			log.Error(err)
 		}
 	}
 
 	// Pull the job step containers
 	if runner.status == messaging.Success {
 		if runner.status, err = pullStepImages(runner.dckr, runner.client, job); err != nil {
-			logcabin.Error.Print(err)
+			log.Error(err)
 		}
 	}
 
 	// // Create the working directory volume
 	if runner.status == messaging.Success {
 		if _, err = runner.dckr.CreateWorkingDirVolume(job.InvocationID); err != nil {
-			logcabin.Error.Print(err)
+			log.Error(err)
 		}
 	}
 
 	wd, err := os.Getwd()
 	if err != nil {
-		logcabin.Error.Print(err)
+		log.Error(err)
 	} else {
 		voldir := path.Join(wd, dockerops.VOLUMEDIR, "logs")
-		logcabin.Info.Printf("path to the volume directory: %s\n", voldir)
+		log.Infof("path to the volume directory: %s\n", voldir)
 		err = os.Mkdir(voldir, 0755)
 		if err != nil {
-			logcabin.Error.Print(err)
+			log.Error(err)
 		}
 
 		if err = writeJobSummary(voldir, job); err != nil {
-			logcabin.Error.Print(err)
+			log.Error(err)
 		}
 
 		if err = writeJobParameters(voldir, job); err != nil {
-			logcabin.Error.Print(err)
+			log.Error(err)
 		}
 	}
 	// If pulls didn't succeed then we can't guarantee that we've got the
@@ -255,7 +254,7 @@ func Run(client *messaging.Client, dckr *dockerops.Docker, exit chan messaging.S
 	// things are already screwed up.
 	if runner.status == messaging.Success {
 		if runner.status, err = downloadInputs(runner.dckr, runner.client, job); err != nil {
-			logcabin.Error.Print(err)
+			log.Error(err)
 		}
 	}
 
@@ -263,7 +262,7 @@ func Run(client *messaging.Client, dckr *dockerops.Docker, exit chan messaging.S
 	// to run the steps if there's no/corrupted data to operate on.
 	if runner.status == messaging.Success {
 		if runner.status, err = runAllSteps(runner.dckr, runner.client, job, exit); err != nil {
-			logcabin.Error.Print(err)
+			log.Error(err)
 		}
 	}
 
@@ -271,7 +270,7 @@ func Run(client *messaging.Client, dckr *dockerops.Docker, exit chan messaging.S
 	// debug issues when the job fails.
 	running(runner.client, runner.job, fmt.Sprintf("Beginning to upload outputs to %s", runner.job.OutputDirectory()))
 	if runner.status, err = uploadOutputs(runner.dckr, runner.client, job); err != nil {
-		logcabin.Error.Print(err)
+		log.Error(err)
 	}
 
 	// Always inform upstream of the job status.
