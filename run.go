@@ -95,7 +95,6 @@ func downloadInputs(dckr *dockerops.Docker, client *messaging.Client, job *model
 func runAllSteps(dckr *dockerops.Docker, client *messaging.Client, job *model.Job, exit chan messaging.StatusCode) (messaging.StatusCode, error) {
 	var err error
 	var exitCode int64
-
 	for idx, step := range job.Steps {
 		running(client, job,
 			fmt.Sprintf(
@@ -105,11 +104,9 @@ func runAllSteps(dckr *dockerops.Docker, client *messaging.Client, job *model.Jo
 				strings.Join(step.Arguments(), " "),
 			),
 		)
-
 		step.Environment["IPLANT_USER"] = job.Submitter
 		step.Environment["IPLANT_EXECUTION_ID"] = job.InvocationID
 		exitCode, err = dckr.RunStep(&step, job.InvocationID, idx)
-
 		if exitCode != 0 || err != nil {
 			if err != nil {
 				running(client, job,
@@ -178,16 +175,13 @@ func Run(client *messaging.Client, dckr *dockerops.Docker, exit chan messaging.S
 		job:    job,
 		status: messaging.Success,
 	}
-
 	host, err := os.Hostname()
 	if err != nil {
 		log.Error(err)
 		host = "UNKNOWN"
 	}
-
 	// let everyone know the job is running
 	running(runner.client, runner.job, fmt.Sprintf("Job %s is running on host %s", runner.job.InvocationID, host))
-
 	transferTrigger, err := os.Create("logs/de-transfer-trigger.log")
 	if err != nil {
 		log.Error(err)
@@ -197,39 +191,33 @@ func Run(client *messaging.Client, dckr *dockerops.Docker, exit chan messaging.S
 			log.Error(err)
 		}
 	}
-
 	if _, err = os.Stat("iplant.cmd"); err != nil {
 		if err = os.Rename("iplant.cmd", "logs/iplant.cmd"); err != nil {
 			log.Error(err)
 		}
 	}
-
 	// Pull the data container images
 	if runner.status, err = pullDataImages(runner.dckr, runner.client, job); err != nil {
 		log.Error(err)
 	}
-
 	// Create the data containers
 	if runner.status == messaging.Success {
 		if runner.status, err = createDataContainers(runner.dckr, runner.client, job); err != nil {
 			log.Error(err)
 		}
 	}
-
 	// Pull the job step containers
 	if runner.status == messaging.Success {
 		if runner.status, err = pullStepImages(runner.dckr, runner.client, job); err != nil {
 			log.Error(err)
 		}
 	}
-
 	// // Create the working directory volume
 	if runner.status == messaging.Success {
 		if _, err = runner.dckr.CreateWorkingDirVolume(job.InvocationID); err != nil {
 			log.Error(err)
 		}
 	}
-
 	wd, err := os.Getwd()
 	if err != nil {
 		log.Error(err)
@@ -257,7 +245,6 @@ func Run(client *messaging.Client, dckr *dockerops.Docker, exit chan messaging.S
 			log.Error(err)
 		}
 	}
-
 	// Only attempt to run the steps if the input downloads succeeded. No reason
 	// to run the steps if there's no/corrupted data to operate on.
 	if runner.status == messaging.Success {
@@ -265,20 +252,17 @@ func Run(client *messaging.Client, dckr *dockerops.Docker, exit chan messaging.S
 			log.Error(err)
 		}
 	}
-
 	// Always attempt to transfer outputs. There might be logs that can help
 	// debug issues when the job fails.
 	running(runner.client, runner.job, fmt.Sprintf("Beginning to upload outputs to %s", runner.job.OutputDirectory()))
 	if runner.status, err = uploadOutputs(runner.dckr, runner.client, job); err != nil {
 		log.Error(err)
 	}
-
 	// Always inform upstream of the job status.
 	if runner.status != messaging.Success {
 		fail(runner.client, runner.job, fmt.Sprintf("Job exited with a status of %d", runner.status))
 	} else {
 		success(runner.client, runner.job)
 	}
-
 	exit <- runner.status
 }
