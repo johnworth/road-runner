@@ -15,6 +15,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/cyverse-de/configurate"
 	"github.com/cyverse-de/dockerops"
 	"github.com/cyverse-de/logcabin"
@@ -34,6 +35,16 @@ var (
 	amqpExchangeType string
 )
 
+var log = logrus.WithFields(logrus.Fields{
+	"service": "road-runner",
+	"art-id":  "road-runner",
+	"group":   "org.cyverse",
+})
+
+func init() {
+	logrus.SetFormatter(&logrus.JSONFormatter{})
+}
+
 func main() {
 	logcabin.Init("road-runner", "road-runner")
 
@@ -44,14 +55,14 @@ func main() {
 	sighandler.Receive(
 		sigquitter,
 		func(sig os.Signal) {
-			logcabin.Info.Println("Received signal:", sig)
+			log.Info("Received signal:", sig)
 
 			if dckr == nil {
-				logcabin.Warning.Println("Docker client is nil, can't clean up. Probably don't need to.")
+				log.Warn("Docker client is nil, can't clean up. Probably don't need to.")
 			}
 
 			if job == nil {
-				logcabin.Warning.Println("Info didn't get parsed from the job file, can't clean up. Probably don't need to.")
+				log.Warn("Info didn't get parsed from the job file, can't clean up. Probably don't need to.")
 			}
 
 			if dckr != nil && job != nil {
@@ -65,7 +76,7 @@ func main() {
 			os.Exit(-1)
 		},
 		func() {
-			logcabin.Info.Println("Signal handler is quitting")
+			log.Info("Signal handler is quitting")
 		},
 	)
 
@@ -96,39 +107,39 @@ func main() {
 	}
 
 	if *cfgPath == "" {
-		logcabin.Error.Fatal("--config must be set.")
+		log.Fatal("--config must be set.")
 	}
 
-	logcabin.Info.Printf("Reading config from %s", *cfgPath)
+	log.Infof("Reading config from %s\n", *cfgPath)
 	if _, err = os.Open(*cfgPath); err != nil {
-		logcabin.Error.Fatal(*cfgPath)
+		log.Fatal(*cfgPath)
 	}
 	cfg, err = configurate.Init(*cfgPath)
 	if err != nil {
-		logcabin.Error.Fatal(err)
+		log.Fatal(err)
 	}
-	logcabin.Info.Printf("Done reading config from %s", *cfgPath)
+	log.Infof("Done reading config from %s\n", *cfgPath)
 
 	if *jobFile == "" {
-		logcabin.Error.Fatal("--job must be set.")
+		log.Fatal("--job must be set.")
 	}
 
 	data, err := ioutil.ReadFile(*jobFile)
 	if err != nil {
-		logcabin.Error.Fatal(err)
+		log.Fatal(err)
 	}
 
 	job, err = model.NewFromData(cfg, data)
 	if err != nil {
-		logcabin.Error.Fatal(err)
+		log.Fatal(err)
 	}
 
 	if _, err = os.Open(*writeTo); err != nil {
-		logcabin.Error.Fatal(err)
+		log.Fatal(err)
 	}
 
 	if err = copyJobFile(job.InvocationID, *jobFile, *writeTo); err != nil {
-		logcabin.Error.Fatal(err)
+		log.Fatal(err)
 	}
 
 	uri := cfg.GetString("amqp.uri")
@@ -137,7 +148,7 @@ func main() {
 
 	client, err = messaging.NewClient(uri, true)
 	if err != nil {
-		logcabin.Error.Fatal(err)
+		log.Fatal(err)
 	}
 	defer client.Close()
 
@@ -146,7 +157,7 @@ func main() {
 	dckr, err = dockerops.NewDocker(context.Background(), cfg, *dockerURI)
 	if err != nil {
 		fail(client, job, "Failed to connect to local docker socket")
-		logcabin.Error.Fatal(err)
+		log.Fatal(err)
 	}
 
 	// The channel that the exit code will be passed along on.
@@ -176,7 +187,7 @@ func main() {
 	exitCode := <-finalExit
 
 	if err = deleteJobFile(job.InvocationID, *writeTo); err != nil {
-		logcabin.Error.Printf("%+v", err)
+		log.Errorf("%+v", err)
 	}
 
 	os.Exit(int(exitCode))
