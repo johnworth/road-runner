@@ -3,7 +3,6 @@ package main
 import (
 	"os"
 
-	"github.com/cyverse-de/logcabin"
 	"github.com/cyverse-de/messaging"
 	"github.com/cyverse-de/model"
 )
@@ -11,14 +10,14 @@ import (
 func hostname() string {
 	h, err := os.Hostname()
 	if err != nil {
-		logcabin.Error.Printf("Couldn't get the hostname: %s", err.Error())
+		log.Errorf("Couldn't get the hostname: %s", err.Error())
 		return ""
 	}
 	return h
 }
 
 func fail(client *messaging.Client, job *model.Job, msg string) error {
-	logcabin.Error.Print(msg)
+	log.Error(msg)
 	return client.PublishJobUpdate(&messaging.UpdateMessage{
 		Job:     job,
 		State:   messaging.FailedState,
@@ -28,7 +27,7 @@ func fail(client *messaging.Client, job *model.Job, msg string) error {
 }
 
 func success(client *messaging.Client, job *model.Job) error {
-	logcabin.Info.Print("Job success")
+	log.Info("Job success")
 	return client.PublishJobUpdate(&messaging.UpdateMessage{
 		Job:    job,
 		State:  messaging.SucceededState,
@@ -44,9 +43,9 @@ func running(client *messaging.Client, job *model.Job, msg string) {
 		Sender:  hostname(),
 	})
 	if err != nil {
-		logcabin.Error.Print(err)
+		log.Error(err)
 	}
-	logcabin.Info.Print(msg)
+	log.Info(msg)
 }
 
 func impendingCancellation(client *messaging.Client, job *model.Job, msg string) {
@@ -57,7 +56,7 @@ func impendingCancellation(client *messaging.Client, job *model.Job, msg string)
 		Sender:  hostname(),
 	})
 	if err != nil {
-		logcabin.Error.Print(err)
+		log.Error(err)
 	}
-	logcabin.Info.Print(msg)
+	log.Info(msg)
 }
