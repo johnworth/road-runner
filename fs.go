@@ -14,16 +14,16 @@ func copyJobFile(uuid, from, toDir string) error {
 	if err != nil {
 		return errors.Wrapf(err, "failed to open %s", from)
 	}
+	defer inputReader.Close()
 	outputFilePath := path.Join(toDir, fmt.Sprintf("%s.json", uuid))
 	outputWriter, err := os.Create(outputFilePath)
 	if err != nil {
 		return errors.Wrapf(err, "failed to write to %s", outputFilePath)
 	}
-
+	defer outputWriter.Close()
 	if _, err := io.Copy(outputWriter, inputReader); err != nil {
 		return errors.Wrapf(err, "failed to copy contents of %s to %s", from, toDir)
 	}
-
 	return nil
 }
 
