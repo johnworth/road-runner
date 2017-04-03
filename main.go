@@ -53,23 +53,18 @@ func main() {
 		sigquitter,
 		func(sig os.Signal) {
 			log.Info("Received signal:", sig)
-
 			if dckr == nil {
 				log.Warn("Docker client is nil, can't clean up. Probably don't need to.")
 			}
-
 			if job == nil {
 				log.Warn("Info didn't get parsed from the job file, can't clean up. Probably don't need to.")
 			}
-
 			if dckr != nil && job != nil {
 				cleanup(job)
 			}
-
 			if client != nil && job != nil {
 				fail(client, job, fmt.Sprintf("Received signal %s", sig))
 			}
-
 			os.Exit(-1)
 		},
 		func() {
