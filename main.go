@@ -60,7 +60,7 @@ func main() {
 				log.Warn("Info didn't get parsed from the job file, can't clean up. Probably don't need to.")
 			}
 			if dckr != nil && job != nil {
-				cleanup(job)
+				cleanup(dckr, job)
 			}
 			if client != nil && job != nil {
 				fail(client, job, fmt.Sprintf("Received signal %s", sig))

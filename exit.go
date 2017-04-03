@@ -9,8 +9,18 @@ import (
 	"github.com/pkg/errors"
 )
 
+// ExitDockerOperator is the interface for Docker operations used by road-runner
+// for clean up operations.
+type ExitDockerOperator interface {
+	ContainersWithLabel(key, value string, all bool) ([]string, error)
+	NukeContainer(id string) error
+	NukeImage(name, tag string) error
+	RemoveVolume(id string) error
+	VolumeExists(id string) (bool, error)
+}
+
 // RemoveVolume removes the docker volume with the provided volume identifier.
-func RemoveVolume(id string) error {
+func RemoveVolume(dckr ExitDockerOperator, id string) error {
 	var (
 		err       error
 		hasVolume bool
@@ -29,7 +39,7 @@ func RemoveVolume(id string) error {
 }
 
 // RemoveJobContainers removes containers based on their job label.
-func RemoveJobContainers(id string) error {
+func RemoveJobContainers(dckr ExitDockerOperator, id string) error {
 	log.Infof("Finding all containers with the label %s=%s", model.DockerLabelKey, id)
 	jobContainers, err := dckr.ContainersWithLabel(model.DockerLabelKey, id, true)
 	if err != nil {
@@ -46,7 +56,7 @@ func RemoveJobContainers(id string) error {
 }
 
 // RemoveDataContainers attempts to remove all data containers.
-func RemoveDataContainers() error {
+func RemoveDataContainers(dckr ExitDockerOperator) error {
 	log.Infoln("Finding all data containers")
 	dataContainers, err := dckr.ContainersWithLabel(dockerops.TypeLabel, strconv.Itoa(dockerops.DataContainer), true)
 	if err != nil {
@@ -63,7 +73,7 @@ func RemoveDataContainers() error {
 }
 
 // RemoveStepContainers attempts to remove all step containers.
-func RemoveStepContainers() error {
+func RemoveStepContainers(dckr ExitDockerOperator) error {
 	log.Infoln("Finding all step containers")
 	stepContainers, err := dckr.ContainersWithLabel(dockerops.TypeLabel, strconv.Itoa(dockerops.StepContainer), true)
 	if err != nil {
@@ -80,7 +90,7 @@ func RemoveStepContainers() error {
 }
 
 // RemoveInputContainers attempts to remove all input containers.
-func RemoveInputContainers() error {
+func RemoveInputContainers(dckr ExitDockerOperator) error {
 	log.Infoln("Finding all input containers")
 	inputContainers, err := dckr.ContainersWithLabel(dockerops.TypeLabel, strconv.Itoa(dockerops.InputContainer), true)
 	if err != nil {
@@ -97,7 +107,7 @@ func RemoveInputContainers() error {
 }
 
 // RemoveDataContainerImages removes the images for the data containers.
-func RemoveDataContainerImages() error {
+func RemoveDataContainerImages(dckr ExitDockerOperator) error {
 	var err error
 	for _, dc := range job.DataContainers() {
 		log.Infof("Nuking image %s:%s", dc.Name, dc.Tag)
@@ -110,19 +120,19 @@ func RemoveDataContainerImages() error {
 }
 
 // cleanup encapsulates common job clean up tasks.
-func cleanup(job *model.Job) {
+func cleanup(dckr ExitDockerOperator, job *model.Job) {
 	var err error
 	log.Infof("Performing aggressive clean up routine...")
-	if err = RemoveInputContainers(); err != nil {
+	if err = RemoveInputContainers(dckr); err != nil {
 		log.Errorf("%+v", err)
 	}
-	if err = RemoveStepContainers(); err != nil {
+	if err = RemoveStepContainers(dckr); err != nil {
 		log.Errorf("%+v", err)
 	}
-	if err = RemoveDataContainers(); err != nil {
+	if err = RemoveDataContainers(dckr); err != nil {
 		log.Errorf("%+v", err)
 	}
-	if err = RemoveVolume(job.InvocationID); err != nil {
+	if err = RemoveVolume(dckr, job.InvocationID); err != nil {
 		log.Errorf("%+v", err)
 	}
 }
@@ -138,29 +148,29 @@ func Exit(exit, finalExit chan messaging.StatusCode) {
 		//but allow the output containers to run. Yanking the rug out from the
 		//containers should force the Run() function to 'fall through' to any clean
 		//up steps.
-		if err = RemoveDataContainerImages(); err != nil {
+		if err = RemoveDataContainerImages(dckr); err != nil {
 			log.Errorf("%+v", err)
 		}
-		if err = RemoveInputContainers(); err != nil {
+		if err = RemoveInputContainers(dckr); err != nil {
 			log.Errorf("%+v", err)
 		}
-		if err = RemoveStepContainers(); err != nil {
+		if err = RemoveStepContainers(dckr); err != nil {
 			log.Errorf("%+v", err)
 		}
-		if err = RemoveDataContainers(); err != nil {
+		if err = RemoveDataContainers(dckr); err != nil {
 			log.Errorf("%+v", err)
 		}
-		if err = RemoveVolume(job.InvocationID); err != nil {
+		if err = RemoveVolume(dckr, job.InvocationID); err != nil {
 			log.Errorf("%+v", err)
 		}
-		if err = RemoveJobContainers(job.InvocationID); err != nil {
+		if err = RemoveJobContainers(dckr, job.InvocationID); err != nil {
 			log.Errorf("%+v", err)
 		}
 	default:
-		if err = RemoveJobContainers(job.InvocationID); err != nil {
+		if err = RemoveJobContainers(dckr, job.InvocationID); err != nil {
 			log.Errorf("%+v", err)
 		}
-		if err = RemoveVolume(job.InvocationID); err != nil {
+		if err = RemoveVolume(dckr, job.InvocationID); err != nil {
 			log.Errorf("%+v", err)
 		}
 	}
