@@ -9,19 +9,31 @@ import (
 	"github.com/cyverse-de/dockerops"
 	"github.com/cyverse-de/messaging"
 	"github.com/cyverse-de/model"
+	"github.com/docker/docker/api/types"
 	"github.com/pkg/errors"
 )
+
+// RunDockerOperator is the set of docker operations used to run a job.
+type RunDockerOperator interface {
+	CreateDataContainer(vf *model.VolumesFrom, invocationID string) (string, error)
+	CreateWorkingDirVolume(volumeID string) (types.Volume, error)
+	DownloadInputs(j *model.Job, i *model.StepInput, index int) (int64, error)
+	Pull(name, tag string) error
+	PullAuthenticated(name, tag, auth string) error
+	RunStep(s *model.Step, invocationID string, stepIndex int) (int64, error)
+	UploadOutputs(j *model.Job) (int64, error)
+}
 
 // JobRunner provides the functionality needed to run jobs.
 type JobRunner struct {
 	client *messaging.Client
-	dckr   *dockerops.Docker
+	dckr   RunDockerOperator
 	exit   chan messaging.StatusCode
 	job    *model.Job
 	status messaging.StatusCode
 }
 
-func pullDataImages(dckr *dockerops.Docker, client *messaging.Client, job *model.Job) (messaging.StatusCode, error) {
+func pullDataImages(dckr RunDockerOperator, client *messaging.Client, job *model.Job) (messaging.StatusCode, error) {
 	var err error
 	for _, dc := range job.DataContainers() {
 		running(client, job, fmt.Sprintf("Pulling container image %s:%s", dc.Name, dc.Tag))
@@ -40,7 +52,7 @@ func pullDataImages(dckr *dockerops.Docker, client *messaging.Client, job *model
 	return messaging.Success, nil
 }
 
-func createDataContainers(dckr *dockerops.Docker, client *messaging.Client, job *model.Job) (messaging.StatusCode, error) {
+func createDataContainers(dckr RunDockerOperator, client *messaging.Client, job *model.Job) (messaging.StatusCode, error) {
 	var err error
 	for _, dc := range job.DataContainers() {
 		running(client, job, fmt.Sprintf("Creating data container %s-%s", dc.NamePrefix, job.InvocationID))
@@ -54,7 +66,7 @@ func createDataContainers(dckr *dockerops.Docker, client *messaging.Client, job 
 	return messaging.Success, nil
 }
 
-func pullStepImages(dckr *dockerops.Docker, client *messaging.Client, job *model.Job) (messaging.StatusCode, error) {
+func pullStepImages(dckr RunDockerOperator, client *messaging.Client, job *model.Job) (messaging.StatusCode, error) {
 	var err error
 	for _, ci := range job.ContainerImages() {
 		running(client, job, fmt.Sprintf("Pulling tool container %s:%s", ci.Name, ci.Tag))
@@ -73,7 +85,7 @@ func pullStepImages(dckr *dockerops.Docker, client *messaging.Client, job *model
 	return messaging.Success, nil
 }
 
-func downloadInputs(dckr *dockerops.Docker, client *messaging.Client, job *model.Job) (messaging.StatusCode, error) {
+func downloadInputs(dckr RunDockerOperator, client *messaging.Client, job *model.Job) (messaging.StatusCode, error) {
 	var err error
 	var exitCode int64
 	for idx, input := range job.Inputs() {
@@ -92,7 +104,7 @@ func downloadInputs(dckr *dockerops.Docker, client *messaging.Client, job *model
 	return messaging.Success, nil
 }
 
-func runAllSteps(dckr *dockerops.Docker, client *messaging.Client, job *model.Job, exit chan messaging.StatusCode) (messaging.StatusCode, error) {
+func runAllSteps(dckr RunDockerOperator, client *messaging.Client, job *model.Job, exit chan messaging.StatusCode) (messaging.StatusCode, error) {
 	var err error
 	var exitCode int64
 	for idx, step := range job.Steps {
@@ -141,7 +153,7 @@ func runAllSteps(dckr *dockerops.Docker, client *messaging.Client, job *model.Jo
 	return messaging.Success, err
 }
 
-func uploadOutputs(dckr *dockerops.Docker, client *messaging.Client, job *model.Job) (messaging.StatusCode, error) {
+func uploadOutputs(dckr RunDockerOperator, client *messaging.Client, job *model.Job) (messaging.StatusCode, error) {
 	var (
 		err      error
 		exitCode int64
@@ -167,10 +179,9 @@ func uploadOutputs(dckr *dockerops.Docker, client *messaging.Client, job *model.
 }
 
 // Run executes the job, and returns the exit code on the exit channel.
-func Run(client *messaging.Client, dckr *dockerops.Docker, exit chan messaging.StatusCode) {
+func Run(client *messaging.Client, dckr RunDockerOperator, exit chan messaging.StatusCode) {
 	runner := &JobRunner{
 		client: client,
-		dckr:   dckr,
 		exit:   exit,
 		job:    job,
 		status: messaging.Success,
@@ -197,24 +208,24 @@ func Run(client *messaging.Client, dckr *dockerops.Docker, exit chan messaging.S
 		}
 	}
 	// Pull the data container images
-	if runner.status, err = pullDataImages(runner.dckr, runner.client, job); err != nil {
+	if runner.status, err = pullDataImages(dckr, runner.client, job); err != nil {
 		log.Error(err)
 	}
 	// Create the data containers
 	if runner.status == messaging.Success {
-		if runner.status, err = createDataContainers(runner.dckr, runner.client, job); err != nil {
+		if runner.status, err = createDataContainers(dckr, runner.client, job); err != nil {
 			log.Error(err)
 		}
 	}
 	// Pull the job step containers
 	if runner.status == messaging.Success {
-		if runner.status, err = pullStepImages(runner.dckr, runner.client, job); err != nil {
+		if runner.status, err = pullStepImages(dckr, runner.client, job); err != nil {
 			log.Error(err)
 		}
 	}
 	// // Create the working directory volume
 	if runner.status == messaging.Success {
-		if _, err = runner.dckr.CreateWorkingDirVolume(job.InvocationID); err != nil {
+		if _, err = dckr.CreateWorkingDirVolume(job.InvocationID); err != nil {
 			log.Error(err)
 		}
 	}
@@ -241,21 +252,21 @@ func Run(client *messaging.Client, dckr *dockerops.Docker, exit chan messaging.S
 	// correct versions of the tools. Don't bother pulling in data in that case,
 	// things are already screwed up.
 	if runner.status == messaging.Success {
-		if runner.status, err = downloadInputs(runner.dckr, runner.client, job); err != nil {
+		if runner.status, err = downloadInputs(dckr, runner.client, job); err != nil {
 			log.Error(err)
 		}
 	}
 	// Only attempt to run the steps if the input downloads succeeded. No reason
 	// to run the steps if there's no/corrupted data to operate on.
 	if runner.status == messaging.Success {
-		if runner.status, err = runAllSteps(runner.dckr, runner.client, job, exit); err != nil {
+		if runner.status, err = runAllSteps(dckr, runner.client, job, exit); err != nil {
 			log.Error(err)
 		}
 	}
 	// Always attempt to transfer outputs. There might be logs that can help
 	// debug issues when the job fails.
 	running(runner.client, runner.job, fmt.Sprintf("Beginning to upload outputs to %s", runner.job.OutputDirectory()))
-	if runner.status, err = uploadOutputs(runner.dckr, runner.client, job); err != nil {
+	if runner.status, err = uploadOutputs(dckr, runner.client, job); err != nil {
 		log.Error(err)
 	}
 	// Always inform upstream of the job status.
