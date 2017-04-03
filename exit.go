@@ -39,7 +39,7 @@ func RemoveJobContainers(id string) error {
 		log.Infof("Nuking container %s", jc)
 		err = dckr.NukeContainer(jc)
 		if err != nil {
-			return errors.Wrapf(err, "failed to remove container %s", jc)
+			log.Errorf("%+v", errors.Wrapf(err, "failed to remove container %s", jc))
 		}
 	}
 	return nil
@@ -56,7 +56,7 @@ func RemoveDataContainers() error {
 		log.Infof("Nuking data container %s", dc)
 		err = dckr.NukeContainer(dc)
 		if err != nil {
-			return errors.Wrapf(err, "failed to remove container %s", dc)
+			log.Errorf("%+v", errors.Wrapf(err, "failed to remove container %s", dc))
 		}
 	}
 	return nil
@@ -73,7 +73,7 @@ func RemoveStepContainers() error {
 		log.Infof("Nuking step container %s", sc)
 		err = dckr.NukeContainer(sc)
 		if err != nil {
-			return errors.Wrapf(err, "failed to remove container %s", sc)
+			log.Errorf("%+v", errors.Wrapf(err, "failed to remove container %s", sc))
 		}
 	}
 	return nil
@@ -90,7 +90,7 @@ func RemoveInputContainers() error {
 		log.Infof("Nuking input container %s", ic)
 		err = dckr.NukeContainer(ic)
 		if err != nil {
-			return errors.Wrapf(err, "failed to remove container %s", ic)
+			log.Errorf("%+v", errors.Wrapf(err, "failed to remove container %s", ic))
 		}
 	}
 	return nil
@@ -103,7 +103,7 @@ func RemoveDataContainerImages() error {
 		log.Infof("Nuking image %s:%s", dc.Name, dc.Tag)
 		err = dckr.NukeImage(dc.Name, dc.Tag)
 		if err != nil {
-			return errors.Wrapf(err, "failed to remove image %s:%s", dc.Name, dc.Tag)
+			log.Errorf("%+v", errors.Wrapf(err, "failed to remove image %s:%s", dc.Name, dc.Tag))
 		}
 	}
 	return nil
