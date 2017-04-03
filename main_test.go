@@ -1,18 +1,15 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
 	"testing"
-	"time"
 
 	"github.com/cyverse-de/configurate"
 	"github.com/cyverse-de/messaging"
 	"github.com/cyverse-de/model"
-	"github.com/streadway/amqp"
 
 	"github.com/spf13/viper"
 )
@@ -108,139 +105,6 @@ func messagingExchangeType() string {
 	return ret
 }
 
-func TestRegisterTimeLimitDeltaListener(t *testing.T) {
-	if !shouldrun() {
-		return
-	}
-	client := GetClient(t)
-	defaultDuration, err := time.ParseDuration("48h")
-	if err != nil {
-		t.Error(err)
-	}
-	exitFunc := func() {
-		fmt.Println("exitFunc called")
-	}
-	timeTracker := NewTimeTracker(defaultDuration, exitFunc)
-	unwanted := timeTracker.EndDate
-	invID := "test_inv"
-	RegisterTimeLimitDeltaListener(client, timeTracker, invID)
-	client.SendTimeLimitDelta(invID, "9h")
-	time.Sleep(1000 * time.Millisecond)
-	if timeTracker.EndDate == unwanted {
-		t.Error("EndDate was still set to the default after sending a delta")
-	}
-}
-
-func TestRegisterTimeLimitRequestListener(t *testing.T) {
-	if !shouldrun() {
-		return
-	}
-	client := GetClient(t)
-	defaultDuration, err := time.ParseDuration("48h")
-	if err != nil {
-		t.Error(err)
-	}
-	exitFunc := func() {
-		fmt.Println("exitFunc called")
-	}
-	timeTracker := NewTimeTracker(defaultDuration, exitFunc)
-	invID := "test"
-	var actual []byte
-	coord := make(chan int)
-	handler := func(d amqp.Delivery) {
-		d.Ack(false)
-		actual = d.Body
-		coord <- 1
-	}
-
-	key := messaging.TimeLimitResponsesKey(invID)
-
-	// This will listen for the messages sent out as a response by RegisterTimeLimitRequestListener
-	client.AddConsumer(messagingExchangeName(), messagingExchangeType(), "yay", key, handler)
-
-	// Listen for time limit requests
-	RegisterTimeLimitRequestListener(client, timeTracker, invID)
-
-	// Send a time limit request
-	err = client.SendTimeLimitRequest(invID)
-	if err != nil {
-		t.Error(err)
-	}
-	time.Sleep(1000 * time.Millisecond)
-	<-coord
-	parsedResponse := &messaging.TimeLimitResponse{}
-	if err = json.Unmarshal(actual, parsedResponse); err != nil {
-		t.Error(err)
-	}
-	if parsedResponse.InvocationID != invID {
-		t.Errorf("InvocationID was %s instead of %s", parsedResponse.InvocationID, invID)
-	}
-	if parsedResponse.MillisecondsRemaining <= 0 {
-		t.Errorf("MillisecondsRemaining was %d instead of >0", parsedResponse.MillisecondsRemaining)
-	}
-}
-
-func TestRegisterStopRequestListener(t *testing.T) {
-	if !shouldrun() {
-		return
-	}
-	client := GetClient(t)
-	invID := "test"
-	exit := make(chan messaging.StatusCode)
-	RegisterStopRequestListener(client, exit, invID)
-	err := client.SendStopRequest(invID, "test", "this is a test")
-	if err != nil {
-		t.Error(err)
-	}
-	actual := <-exit
-	if actual != messaging.StatusKilled {
-		t.Errorf("StatusCode was %d instead of %d", int64(actual), int64(messaging.StatusKilled))
-	}
-}
-
-func TestNewTimeTracker(t *testing.T) {
-	actual := 0
-	expected := 1
-	duration, err := time.ParseDuration("1s")
-	if err != nil {
-		t.Error(err)
-	}
-	coord := make(chan int)
-	handler := func() {
-		actual = 1
-		coord <- 1
-	}
-	tt := NewTimeTracker(duration, handler)
-	if tt == nil {
-		t.Error("NewTimeTracker returned nil")
-	}
-	<-coord
-	if actual != expected {
-		t.Errorf("actual was %d instead of %d", actual, expected)
-	}
-}
-
-func TestApplyDelta(t *testing.T) {
-	defaultDuration, err := time.ParseDuration("10s")
-	if err != nil {
-		t.Error(err)
-	}
-	resetDuration, err := time.ParseDuration("20s")
-	if err != nil {
-		t.Error(err)
-	}
-	handler := func() {}
-	tt := NewTimeTracker(defaultDuration, handler)
-	firstDate := tt.EndDate
-	if err = tt.ApplyDelta(resetDuration); err != nil {
-		t.Error(err)
-	}
-	secondDate := tt.EndDate
-	if !secondDate.After(firstDate) {
-		t.Errorf("The date after ApplyDelta() was %s, which isn't later than %s", secondDate.String(), firstDate.String())
-	}
-}
-
 func TestCopyJobFile(t *testing.T) {
 	uuid := "00000000-0000-0000-0000-000000000000"
 	from := path.Join("test", fmt.Sprintf("%s.json", uuid))
@@ -271,48 +135,5 @@ func TestDeleteJobFile(t *testing.T) {
 	tmpPath := path.Join(to, fmt.Sprintf("%s.json", uuid))
 	if _, err := os.Open(tmpPath); err == nil {
 		t.Errorf("tmpPath %s existed after deleteJobFile() was called", tmpPath)
-	}
-}
-
-func TestJobWithoutCancellationWarning(t *testing.T) {
-	if determineCancellationWarningBuffer(59*time.Second) != 0 {
-		t.Error("A timeout warning message would be produced when it shouldn't")
-	}
-}
-
-func TestJobWithMinimumWarningBuffer(t *testing.T) {
-	cancellationWarningBuffer := determineCancellationWarningBuffer(61 * time.Second)
-	if cancellationWarningBuffer == 0 {
-		t.Error("A timeout warning would" +
-			" not be produced when it should")
-	} else if cancellationWarningBuffer != minCancellationBuffer {
-		t.Errorf(
-			"Unexpected duration between cancellation warning and job cancellation: %s",
-			cancellationWarningBuffer.String(),
-		)
-	}
-}
-
-func TestJobWithDefaultWarningBuffer(t *testing.T) {
-	cancellationWarningBuffer := determineCancellationWarningBuffer(500 * time.Second)
-	if cancellationWarningBuffer == 0 {
-		t.Error("A timeout warning would not be produced when it should")
-	} else if cancellationWarningBuffer != 100*time.Second {
-		t.Errorf(
-			"Unexpected duration between cancellation warning and job cancellation: %s",
-			cancellationWarningBuffer.String(),
-		)
-	}
-}
-
-func TestJobWithMaximumWarningBuffer(t *testing.T) {
-	cancellationWarningBuffer := determineCancellationWarningBuffer(30 * time.Minute)
-	if cancellationWarningBuffer == 0 {
-		t.Error("A timeout warning would not be produced when it should")
-	} else if cancellationWarningBuffer != maxCancellationBuffer {
-		t.Errorf(
-			"Unexpected duration between cancellation warning and job cancellation: %s",
-			cancellationWarningBuffer.String(),
-		)
 	}
 }
