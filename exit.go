@@ -106,8 +106,14 @@ func RemoveInputContainers(dckr ExitDockerOperator) error {
 	return nil
 }
 
+// DataContainerLister is an interface for objects that can returns a list
+// of data containers.
+type DataContainerLister interface {
+	DataContainers() []model.VolumesFrom
+}
+
 // RemoveDataContainerImages removes the images for the data containers.
-func RemoveDataContainerImages(dckr ExitDockerOperator) error {
+func RemoveDataContainerImages(dckr ExitDockerOperator, job DataContainerLister) error {
 	var err error
 	for _, dc := range job.DataContainers() {
 		log.Infof("Nuking image %s:%s", dc.Name, dc.Tag)
@@ -148,7 +154,7 @@ func Exit(exit, finalExit chan messaging.StatusCode) {
 		//but allow the output containers to run. Yanking the rug out from the
 		//containers should force the Run() function to 'fall through' to any clean
 		//up steps.
-		if err = RemoveDataContainerImages(dckr); err != nil {
+		if err = RemoveDataContainerImages(dckr, job); err != nil {
 			log.Errorf("%+v", err)
 		}
 		if err = RemoveInputContainers(dckr); err != nil {
