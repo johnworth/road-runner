@@ -21,6 +21,7 @@ import (
 	"github.com/cyverse-de/logcabin"
 	"github.com/cyverse-de/messaging"
 	"github.com/cyverse-de/model"
+	"github.com/cyverse-de/road-runner/fs"
 	"github.com/cyverse-de/version"
 	"github.com/streadway/amqp"
 
@@ -119,7 +120,7 @@ func main() {
 	if _, err = os.Open(*writeTo); err != nil {
 		log.Fatal(err)
 	}
-	if err = copyJobFile(job.InvocationID, *jobFile, *writeTo); err != nil {
+	if err = fs.CopyJobFile(fs.FS, job.InvocationID, *jobFile, *writeTo); err != nil {
 		log.Fatal(err)
 	}
 	uri := cfg.GetString("amqp.uri")
@@ -155,7 +156,7 @@ func main() {
 		})
 	go Run(client, dckr, exit)
 	exitCode := <-finalExit
-	if err = deleteJobFile(job.InvocationID, *writeTo); err != nil {
+	if err = fs.DeleteJobFile(fs.FS, job.InvocationID, *writeTo); err != nil {
 		log.Errorf("%+v", err)
 	}
 	os.Exit(int(exitCode))

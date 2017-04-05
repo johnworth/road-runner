@@ -1,10 +1,8 @@
 package main
 
 import (
-	"fmt"
 	"io/ioutil"
 	"os"
-	"path"
 	"testing"
 
 	"github.com/cyverse-de/configurate"
@@ -103,37 +101,4 @@ func messagingExchangeName() string {
 func messagingExchangeType() string {
 	ret := cfg.GetString("amqp.exchange.type")
 	return ret
-}
-
-func TestCopyJobFile(t *testing.T) {
-	uuid := "00000000-0000-0000-0000-000000000000"
-	from := path.Join("test", fmt.Sprintf("%s.json", uuid))
-	to := "/tmp"
-	err := copyJobFile(uuid, from, to)
-	if err != nil {
-		t.Error(err)
-	}
-	tmpPath := path.Join(to, fmt.Sprintf("%s.json", uuid))
-	if _, err := os.Open(tmpPath); err != nil {
-		t.Error(err)
-	} else {
-		if err = os.Remove(tmpPath); err != nil {
-			t.Error(err)
-		}
-	}
-}
-
-func TestDeleteJobFile(t *testing.T) {
-	uuid := "00000000-0000-0000-0000-000000000000"
-	from := path.Join("test", fmt.Sprintf("%s.json", uuid))
-	to := "/tmp"
-	err := copyJobFile(uuid, from, to)
-	if err != nil {
-		t.Error(err)
-	}
-	deleteJobFile(uuid, to)
-	tmpPath := path.Join(to, fmt.Sprintf("%s.json", uuid))
-	if _, err := os.Open(tmpPath); err == nil {
-		t.Errorf("tmpPath %s existed after deleteJobFile() was called", tmpPath)
-	}
 }
