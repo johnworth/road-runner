@@ -6,6 +6,8 @@ import (
 	"path"
 	"reflect"
 	"testing"
+
+	"github.com/cyverse-de/model"
 )
 
 func TestWriteCSV(t *testing.T) {
@@ -40,14 +42,20 @@ test2,test2,test2
 }
 
 func TestWriteJobSummary(t *testing.T) {
-	inittests(t)
+	j := &model.Job{
+		InvocationID: "07b04ce2-7757-4b21-9e15-0b4c2f44be26",
+		Name:         "Echo_test",
+		AppID:        "c7f05682-23c8-4182-b9a2-e09650a5f49b",
+		AppName:      "Word Count",
+		Submitter:    "test_this_is_a_test",
+	}
 	expected := `Job ID,07b04ce2-7757-4b21-9e15-0b4c2f44be26
 Job Name,Echo_test
 Application ID,c7f05682-23c8-4182-b9a2-e09650a5f49b
 Application Name,Word Count
 Submitted By,test_this_is_a_test
 `
-	if err := writeJobSummary("test", s); err != nil {
+	if err := writeJobSummary("test", j); err != nil {
 		t.Error(err)
 	}
 	outPath := "test/JobSummary.csv"
@@ -65,10 +73,23 @@ Submitted By,test_this_is_a_test
 }
 
 func TestStepToRecord(t *testing.T) {
-	inittests(t)
-	actual := stepToRecord(&s.Steps[0])
+	step := &model.Step{
+		Component: model.StepComponent{
+			Location: "/this/is/a/location",
+			Name:     "test-name",
+		},
+		Config: model.StepConfig{
+			Params: []model.StepParam{
+				{
+					Name:  "parameter-name",
+					Value: "This is a test",
+				},
+			},
+		},
+	}
+	actual := stepToRecord(step)
 	expected := [][]string{
-		{"", "", "This is a test"},
+		{"", "parameter-name", "This is a test"},
 	}
 	if !reflect.DeepEqual(actual, expected) {
 		t.Errorf("Record %#v does not equal %#v", actual, expected)
@@ -76,11 +97,28 @@ func TestStepToRecord(t *testing.T) {
 }
 
 func TestWriteJobParameters(t *testing.T) {
-	inittests(t)
+	j := &model.Job{
+		Steps: []model.Step{
+			{
+				Component: model.StepComponent{
+					Location: "/this/is/a/location",
+					Name:     "test-name",
+				},
+				Config: model.StepConfig{
+					Params: []model.StepParam{
+						{
+							Name:  "parameter-name",
+							Value: "This is a test",
+						},
+					},
+				},
+			},
+		},
+	}
 	expected := `Executable,Argument Option,Argument Value
-,,This is a test
+,parameter-name,This is a test
 `
-	if err := writeJobParameters("test", s); err != nil {
+	if err := writeJobParameters("test", j); err != nil {
 		t.Error(err)
 	}
 	outPath := "test/JobParameters.csv"
