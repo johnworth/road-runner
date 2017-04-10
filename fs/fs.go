@@ -1,11 +1,13 @@
 package fs
 
 import (
+	"encoding/csv"
 	"fmt"
 	"io"
 	"os"
 	"path"
 
+	"github.com/cyverse-de/model"
 	"github.com/pkg/errors"
 )
 
@@ -63,4 +65,72 @@ func DeleteJobFile(fs FileSystem, uuid, toDir string) error {
 		return errors.Wrapf(err, "failed to remove %s", filePath)
 	}
 	return nil
+}
+
+// WriteCSV writes out the passed in records as CSV content to the passed in
+// io.Writer.
+func WriteCSV(fileWriter io.Writer, records [][]string) (err error) {
+	writer := csv.NewWriter(fileWriter)
+	for _, record := range records {
+		if err = writer.Write(record); err != nil {
+			return err
+		}
+	}
+	writer.Flush()
+	return writer.Error()
+}
+
+// WriteJobSummary writes out a CSV summary of the passed in *model.Job to a
+// file called "JobSummary.csv" in the provided output directory.
+func WriteJobSummary(fs FileSystem, outputDir string, job *model.Job) error {
+	outputPath := path.Join(outputDir, "JobSummary.csv")
+	fileWriter, err := fs.Create(outputPath)
+	if err != nil {
+		return err
+	}
+	defer fileWriter.Close()
+	records := [][]string{
+		{"Job ID", job.InvocationID},
+		{"Job Name", job.Name},
+		{"Application ID", job.AppID},
+		{"Application Name", job.AppName},
+		{"Submitted By", job.Submitter},
+	}
+	return WriteCSV(fileWriter, records)
+}
+
+// stepToRecord converts a *model.Step to a [][]string so it can be turned into
+// part of a CSV file.
+func stepToRecord(step *model.Step) [][]string {
+	var retval [][]string
+	params := step.Config.Parameters()
+	for _, p := range params {
+		retval = append(retval, []string{
+			step.Executable(),
+			p.Name,
+			p.Value,
+		})
+	}
+	return retval
+}
+
+// WriteJobParameters writes out the *model.Job's parameters to a CSV file
+// called "JobParameters.csv" located in the output directory.
+func WriteJobParameters(fs FileSystem, outputDir string, job *model.Job) error {
+	outputPath := path.Join(outputDir, "JobParameters.csv")
+	fileWriter, err := fs.Create(outputPath)
+	if err != nil {
+		return err
+	}
+	defer fileWriter.Close()
+	records := [][]string{
+		{"Executable", "Argument Option", "Argument Value"},
+	}
+	for _, s := range job.Steps {
+		stepRecords := stepToRecord(&s)
+		for _, sr := range stepRecords {
+			records = append(records, sr)
+		}
+	}
+	return WriteCSV(fileWriter, records)
 }

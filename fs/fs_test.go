@@ -4,9 +4,13 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path"
+	"reflect"
 	"testing"
+
+	"github.com/cyverse-de/model"
 )
 
 type testFS struct {
@@ -172,5 +176,125 @@ func TestDeleteJobFileFail(t *testing.T) {
 	err = DeleteJobFile(tfs, uuid, to)
 	if err == nil {
 		t.Error("err was nil")
+	}
+}
+
+func TestWriteCSV(t *testing.T) {
+	expected := `test0,test0,test0
+test1,test1,test1
+test2,test2,test2
+`
+	records := [][]string{
+		{"test0", "test0", "test0"},
+		{"test1", "test1", "test1"},
+		{"test2", "test2", "test2"},
+	}
+	buf := bytes.NewBuffer([]byte{})
+	if err := WriteCSV(buf, records); err != nil {
+		t.Error(err)
+	}
+	actual := string(buf.Bytes())
+	if actual != expected {
+		t.Errorf("Contents of csv were:\n%s\n\tinstead of:\n%s\n", actual, expected)
+	}
+}
+
+func TestWriteJobSummary(t *testing.T) {
+	tfs := newTestFS()
+	j := &model.Job{
+		InvocationID: "07b04ce2-7757-4b21-9e15-0b4c2f44be26",
+		Name:         "Echo_test",
+		AppID:        "c7f05682-23c8-4182-b9a2-e09650a5f49b",
+		AppName:      "Word Count",
+		Submitter:    "test_this_is_a_test",
+	}
+	expected := `Job ID,07b04ce2-7757-4b21-9e15-0b4c2f44be26
+Job Name,Echo_test
+Application ID,c7f05682-23c8-4182-b9a2-e09650a5f49b
+Application Name,Word Count
+Submitted By,test_this_is_a_test
+`
+	if err := WriteJobSummary(tfs, "test", j); err != nil {
+		t.Error(err)
+	}
+	outPath := "test/JobSummary.csv"
+	inputreader, err := tfs.Open(outPath)
+	if err != nil {
+		t.Error(err)
+	}
+	buf := bytes.NewBuffer([]byte{})
+	_, err = io.Copy(buf, inputreader)
+	if err != nil {
+		t.Error(err)
+	}
+	actual := buf.String()
+	if actual != expected {
+		t.Errorf("Contents of %s were:\n%s\n\tinstead of:\n%s\n", outPath, actual, expected)
+	}
+}
+
+func TestStepToRecord(t *testing.T) {
+	step := &model.Step{
+		Component: model.StepComponent{
+			Location: "/this/is/a/location",
+			Name:     "test-name",
+		},
+		Config: model.StepConfig{
+			Params: []model.StepParam{
+				{
+					Name:  "parameter-name",
+					Value: "This is a test",
+				},
+			},
+		},
+	}
+	actual := stepToRecord(step)
+	expected := [][]string{
+		{"", "parameter-name", "This is a test"},
+	}
+	if !reflect.DeepEqual(actual, expected) {
+		t.Errorf("Record %#v does not equal %#v", actual, expected)
+	}
+}
+
+func TestWriteJobParameters(t *testing.T) {
+	tfs := newTestFS()
+	j := &model.Job{
+		Steps: []model.Step{
+			{
+				Component: model.StepComponent{
+					Location: "/this/is/a/location",
+					Name:     "test-name",
+				},
+				Config: model.StepConfig{
+					Params: []model.StepParam{
+						{
+							Name:  "parameter-name",
+							Value: "This is a test",
+						},
+					},
+				},
+			},
+		},
+	}
+	expected := `Executable,Argument Option,Argument Value
+,parameter-name,This is a test
+`
+	if err := WriteJobParameters(tfs, "test", j); err != nil {
+		t.Error(err)
+	}
+	outPath := "test/JobParameters.csv"
+	inputreader, err := tfs.Open(outPath)
+	if err != nil {
+		t.Error(err)
+	}
+	buf := bytes.NewBuffer([]byte{})
+	_, err = io.Copy(buf, inputreader)
+	if err != nil {
+		t.Error(err)
+	}
+	actual := buf.String()
+	if actual != expected {
+		t.Errorf("Contents of %s were:\n%s\n\tinstead of:\n%s\n", outPath, actual, expected)
 	}
 }

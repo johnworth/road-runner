@@ -9,6 +9,7 @@ import (
 	"github.com/cyverse-de/dockerops"
 	"github.com/cyverse-de/messaging"
 	"github.com/cyverse-de/model"
+	"github.com/cyverse-de/road-runner/fs"
 	"github.com/docker/docker/api/types"
 	"github.com/pkg/errors"
 )
@@ -240,11 +241,11 @@ func Run(client *messaging.Client, dckr RunDockerOperator, exit chan messaging.S
 			log.Error(err)
 		}
 
-		if err = writeJobSummary(voldir, job); err != nil {
+		if err = fs.WriteJobSummary(fs.FS, voldir, job); err != nil {
 			log.Error(err)
 		}
 
-		if err = writeJobParameters(voldir, job); err != nil {
+		if err = fs.WriteJobParameters(fs.FS, voldir, job); err != nil {
 			log.Error(err)
 		}
 	}
