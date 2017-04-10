@@ -53,16 +53,3 @@ func running(client JobUpdatePublisher, job *model.Job, msg string) {
 	}
 	log.Info(msg)
 }
-
-func impendingCancellation(client JobUpdatePublisher, job *model.Job, msg string) {
-	err := client.PublishJobUpdate(&messaging.UpdateMessage{
-		Job:     job,
-		State:   messaging.ImpendingCancellationState,
-		Message: msg,
-		Sender:  hostname(),
-	})
-	if err != nil {
-		log.Error(err)
-	}
-	log.Info(msg)
-}
