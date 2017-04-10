@@ -16,12 +16,6 @@ func hostname() string {
 	return h
 }
 
-// JobUpdatePublisher is the interface for types that need to publish a job
-// update.
-type JobUpdatePublisher interface {
-	PublishJobUpdate(m *messaging.UpdateMessage) error
-}
-
 func fail(client JobUpdatePublisher, job *model.Job, msg string) error {
 	log.Error(msg)
 	return client.PublishJobUpdate(&messaging.UpdateMessage{

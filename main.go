@@ -154,7 +154,7 @@ func main() {
 			running(client, job, "Received stop request")
 			exit <- messaging.StatusKilled
 		})
-	go Run(client, dckr, exit)
+	go Run(dckr, client, job, exit)
 	exitCode := <-finalExit
 	if err = fs.DeleteJobFile(fs.FS, job.InvocationID, *writeTo); err != nil {
 		log.Errorf("%+v", err)

@@ -27,14 +27,20 @@ type RunDockerOperator interface {
 
 // JobRunner provides the functionality needed to run jobs.
 type JobRunner struct {
-	client *messaging.Client
+	client JobUpdatePublisher
 	dckr   RunDockerOperator
 	exit   chan messaging.StatusCode
 	job    *model.Job
 	status messaging.StatusCode
 }
 
-func pullDataImages(dckr RunDockerOperator, client *messaging.Client, job *model.Job) (messaging.StatusCode, error) {
+// JobUpdatePublisher is the interface for types that need to publish a job
+// update.
+type JobUpdatePublisher interface {
+	PublishJobUpdate(m *messaging.UpdateMessage) error
+}
+
+func pullDataImages(dckr RunDockerOperator, client JobUpdatePublisher, job *model.Job) (messaging.StatusCode, error) {
 	var err error
 	for _, dc := range job.DataContainers() {
 		running(client, job, fmt.Sprintf("Pulling container image %s:%s", dc.Name, dc.Tag))
@@ -53,7 +59,7 @@ func pullDataImages(dckr RunDockerOperator, client *messaging.Client, job *model
 	return messaging.Success, nil
 }
 
-func createDataContainers(dckr RunDockerOperator, client *messaging.Client, job *model.Job) (messaging.StatusCode, error) {
+func createDataContainers(dckr RunDockerOperator, client JobUpdatePublisher, job *model.Job) (messaging.StatusCode, error) {
 	var err error
 	for _, dc := range job.DataContainers() {
 		running(client, job, fmt.Sprintf("Creating data container %s-%s", dc.NamePrefix, job.InvocationID))
@@ -67,7 +73,7 @@ func createDataContainers(dckr RunDockerOperator, client *messaging.Client, job 
 	return messaging.Success, nil
 }
 
-func pullStepImages(dckr RunDockerOperator, client *messaging.Client, job *model.Job) (messaging.StatusCode, error) {
+func pullStepImages(dckr RunDockerOperator, client JobUpdatePublisher, job *model.Job) (messaging.StatusCode, error) {
 	var err error
 	for _, ci := range job.ContainerImages() {
 		running(client, job, fmt.Sprintf("Pulling tool container %s:%s", ci.Name, ci.Tag))
@@ -86,7 +92,7 @@ func pullStepImages(dckr RunDockerOperator, client *messaging.Client, job *model
 	return messaging.Success, nil
 }
 
-func downloadInputs(dckr RunDockerOperator, client *messaging.Client, job *model.Job) (messaging.StatusCode, error) {
+func downloadInputs(dckr RunDockerOperator, client JobUpdatePublisher, job *model.Job) (messaging.StatusCode, error) {
 	var err error
 	var exitCode int64
 	for idx, input := range job.Inputs() {
@@ -105,7 +111,7 @@ func downloadInputs(dckr RunDockerOperator, client *messaging.Client, job *model
 	return messaging.Success, nil
 }
 
-func runAllSteps(dckr RunDockerOperator, client *messaging.Client, job *model.Job, exit chan messaging.StatusCode) (messaging.StatusCode, error) {
+func runAllSteps(dckr RunDockerOperator, client JobUpdatePublisher, job *model.Job, exit chan messaging.StatusCode) (messaging.StatusCode, error) {
 	var err error
 	var exitCode int64
 	for idx, step := range job.Steps {
@@ -154,7 +160,7 @@ func runAllSteps(dckr RunDockerOperator, client *messaging.Client, job *model.Jo
 	return messaging.Success, err
 }
 
-func uploadOutputs(dckr RunDockerOperator, client *messaging.Client, job *model.Job) (messaging.StatusCode, error) {
+func uploadOutputs(dckr RunDockerOperator, client JobUpdatePublisher, job *model.Job) (messaging.StatusCode, error) {
 	var (
 		err      error
 		exitCode int64
@@ -180,7 +186,7 @@ func uploadOutputs(dckr RunDockerOperator, client *messaging.Client, job *model.
 }
 
 // Run executes the job, and returns the exit code on the exit channel.
-func Run(client *messaging.Client, dckr RunDockerOperator, exit chan messaging.StatusCode) {
+func Run(dckr RunDockerOperator, client JobUpdatePublisher, job *model.Job, exit chan messaging.StatusCode) {
 	runner := &JobRunner{
 		client: client,
 		exit:   exit,
