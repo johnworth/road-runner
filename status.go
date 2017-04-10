@@ -16,7 +16,13 @@ func hostname() string {
 	return h
 }
 
-func fail(client *messaging.Client, job *model.Job, msg string) error {
+// JobUpdatePublisher is the interface for types that need to publish a job
+// update.
+type JobUpdatePublisher interface {
+	PublishJobUpdate(m *messaging.UpdateMessage) error
+}
+
+func fail(client JobUpdatePublisher, job *model.Job, msg string) error {
 	log.Error(msg)
 	return client.PublishJobUpdate(&messaging.UpdateMessage{
 		Job:     job,
@@ -26,7 +32,7 @@ func fail(client *messaging.Client, job *model.Job, msg string) error {
 	})
 }
 
-func success(client *messaging.Client, job *model.Job) error {
+func success(client JobUpdatePublisher, job *model.Job) error {
 	log.Info("Job success")
 	return client.PublishJobUpdate(&messaging.UpdateMessage{
 		Job:    job,
@@ -35,7 +41,7 @@ func success(client *messaging.Client, job *model.Job) error {
 	})
 }
 
-func running(client *messaging.Client, job *model.Job, msg string) {
+func running(client JobUpdatePublisher, job *model.Job, msg string) {
 	err := client.PublishJobUpdate(&messaging.UpdateMessage{
 		Job:     job,
 		State:   messaging.RunningState,
@@ -48,7 +54,7 @@ func running(client *messaging.Client, job *model.Job, msg string) {
 	log.Info(msg)
 }
 
-func impendingCancellation(client *messaging.Client, job *model.Job, msg string) {
+func impendingCancellation(client JobUpdatePublisher, job *model.Job, msg string) {
 	err := client.PublishJobUpdate(&messaging.UpdateMessage{
 		Job:     job,
 		State:   messaging.ImpendingCancellationState,
