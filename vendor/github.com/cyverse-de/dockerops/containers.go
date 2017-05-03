@@ -647,12 +647,24 @@ func (d *Docker) CreateDownloadContainer(job *model.Job, input *model.StepInput,
 	hostConfig := &container.HostConfig{}
 	invID := job.InvocationID
 
-	image = d.cfg.GetString("porklock.image")
-	tag = d.cfg.GetString("porklock.tag")
+	image = d.cfg.GetString("porklock.image")    // Used to pull the correct porklock image.
+	tag = d.cfg.GetString("porklock.tag")        // Used to pull the correct porklock image.
+	vaultaddress := d.cfg.GetString("vault.url") // Used by porklock to pull the iRODS config from Vault.
+	vaulttoken := d.cfg.GetString("vault.token") // Used by porklock to pull the iRODS config from Vault.
 
+	// The porklock image is needed before a container can be created from it.
 	if err = d.PorkPull(); err != nil {
 		return "", err
 	}
+
+	// It makes little sense to have only one of these set
+	if vaultaddress != "" && vaulttoken != "" {
+		config.Env = append(config.Env, fmt.Sprintf("%s=%s", "VAULT_ADDR", vaultaddress))
+		config.Env = append(config.Env, fmt.Sprintf("%s=%s", "VAULT_TOKEN", vaulttoken))
+	}
+
+	// This should always be present, so it's okay to always add it.
+	config.Env = append(config.Env, fmt.Sprintf("%s=%s", "JOB_UUID", invID))
 
 	config.Image = fmt.Sprintf("%s:%s", image, tag)
 	hostConfig.LogConfig = container.LogConfig{Type: "none"}
@@ -756,10 +768,21 @@ func (d *Docker) CreateUploadContainer(job *model.Job) (string, error) {
 
 	image = d.cfg.GetString("porklock.image")
 	tag = d.cfg.GetString("porklock.tag")
+	vaultaddress := d.cfg.GetString("vault.url")
+	vaulttoken := d.cfg.GetString("vault.token")
 
 	if err = d.PorkPull(); err != nil {
 		return "", err
 	}
+
+	// There's no point in only having one of them set.
+	if vaultaddress != "" && vaulttoken != "" {
+		config.Env = append(config.Env, fmt.Sprintf("%s=%s", "VAULT_ADDR", vaultaddress))
+		config.Env = append(config.Env, fmt.Sprintf("%s=%s", "VAULT_TOKEN", vaulttoken))
+	}
+
+	// This should always be present, so it's okay to always add it.
+	config.Env = append(config.Env, fmt.Sprintf("%s=%s", "JOB_UUID", invID))
 
 	config.Image = fmt.Sprintf("%s:%s", image, tag)
 	hostConfig.LogConfig = container.LogConfig{Type: "none"}
