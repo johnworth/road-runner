@@ -70,7 +70,7 @@
 			"importpath": "github.com/cyverse-de/model",
 			"repository": "https://github.com/cyverse-de/model",
 			"vcs": "git",
-			"revision": "c9e9dc1cfc2e766576141cce71b67f83cea52cd2",
+			"revision": "5b0f3dc6391419e5f0180f20d196d66e5ec60d6e",
 			"branch": "master",
 			"notests": true
 		},
