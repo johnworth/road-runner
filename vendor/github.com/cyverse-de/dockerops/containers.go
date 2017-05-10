@@ -657,6 +657,9 @@ func (d *Docker) CreateDownloadContainer(job *model.Job, input *model.StepInput,
 		return "", err
 	}
 
+	// Set the IPC_LOCK capability on the porklock container
+	hostConfig.CapAdd = append(hostConfig.CapAdd, "IPC_LOCK")
+
 	// It makes little sense to have only one of these set
 	if vaultaddress != "" && vaulttoken != "" {
 		config.Env = append(config.Env, fmt.Sprintf("%s=%s", "VAULT_ADDR", vaultaddress))
@@ -786,6 +789,7 @@ func (d *Docker) CreateUploadContainer(job *model.Job) (string, error) {
 
 	config.Image = fmt.Sprintf("%s:%s", image, tag)
 	hostConfig.LogConfig = container.LogConfig{Type: "none"}
+	hostConfig.CapAdd = append(hostConfig.CapAdd, "IPC_LOCK")
 
 	config.WorkingDir = WORKDIR
 
