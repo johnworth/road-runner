@@ -1,6 +1,7 @@
 package dcompose
 
 import (
+	"reflect"
 	"testing"
 
 	yaml "gopkg.in/yaml.v2"
@@ -29,7 +30,7 @@ networks:
 services:
   service-test-1:
     image: hello-world
-    command: echo hi
+    command: [echo, hi]
     container_name: this-is-a-test
     dns:
       - "8.8.8.8"
@@ -105,19 +106,19 @@ services:
 	if jc.Volumes["test0"].Driver != "local" {
 		t.Errorf("test0 volume driver was %s instead of 'local'", jc.Volumes["test0"].Driver)
 	}
-	if _, ok := jc.Volumes["test0"].DriverOpts["opt0"]; !ok {
+	if _, ok := jc.Volumes["test0"].Options["opt0"]; !ok {
 		t.Error("opt0 volume driver option not found")
 	}
-	if _, ok := jc.Volumes["test0"].DriverOpts["opt1"]; !ok {
+	if _, ok := jc.Volumes["test0"].Options["opt1"]; !ok {
 		t.Error("opt1 volume driver option not found")
 	}
 	if jc.Volumes["test1"].Driver != "fake" {
 		t.Errorf("test1 volume driver was %s instead of 'fake'", jc.Volumes["test1"].Driver)
 	}
-	if _, ok := jc.Volumes["test1"].DriverOpts["opt2"]; !ok {
+	if _, ok := jc.Volumes["test1"].Options["opt2"]; !ok {
 		t.Error("opt2 volume driver option not found")
 	}
-	if _, ok := jc.Volumes["test1"].DriverOpts["opt3"]; !ok {
+	if _, ok := jc.Volumes["test1"].Options["opt3"]; !ok {
 		t.Error("opt3 volume driver option not found")
 	}
 	if len(jc.Services) != 1 {
@@ -130,7 +131,7 @@ services:
 	if svc.Image != "hello-world" {
 		t.Errorf("image was %s", svc.Image)
 	}
-	if svc.Command != "echo hi" {
+	if !reflect.DeepEqual(svc.Command, []string{"echo", "hi"}) {
 		t.Errorf("command was '%s'", svc.Command)
 	}
 	if svc.ContainerName != "this-is-a-test" {
@@ -243,5 +244,15 @@ services:
 	}
 	if svc.WorkingDir != "/working_dir" {
 		t.Errorf("working directory was %s instead of /working_dir", svc.WorkingDir)
+	}
+}
+
+func TestNew(t *testing.T) {
+	jc := New()
+	if jc == nil {
+		t.Error("New() returned nil")
+	}
+	if jc.Version != "3.1" {
+		t.Errorf("version was %s", jc.Version)
 	}
 }
