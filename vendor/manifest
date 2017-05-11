@@ -43,14 +43,6 @@
 			"notests": true
 		},
 		{
-			"importpath": "github.com/cyverse-de/dockerops",
-			"repository": "https://github.com/cyverse-de/dockerops",
-			"vcs": "git",
-			"revision": "e9b506dc2f06305d9b79b84328fb8a4bd27e74eb",
-			"branch": "master",
-			"notests": true
-		},
-		{
 			"importpath": "github.com/cyverse-de/logcabin",
 			"repository": "https://github.com/cyverse-de/logcabin",
 			"vcs": "git",
@@ -116,15 +108,6 @@
 			"revision": "cd82a31edbae37c31212ac8b23180d90735ceab4",
 			"branch": "master",
 			"path": "/api/types",
-			"notests": true
-		},
-		{
-			"importpath": "github.com/docker/docker/client",
-			"repository": "https://github.com/docker/docker",
-			"vcs": "git",
-			"revision": "fe9f5610c49b1a6ca2ebbb68c1478fc7f106eaa8",
-			"branch": "master",
-			"path": "/client",
 			"notests": true
 		},
 		{
