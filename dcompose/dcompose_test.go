@@ -4,8 +4,89 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/cyverse-de/model"
+
 	yaml "gopkg.in/yaml.v2"
 )
+
+var testJob = &model.Job{
+	ID:           "test-job-id",
+	InvocationID: "test-invocation-id",
+	Steps: []model.Step{
+		{
+			Type:       "condor",
+			StdinPath:  "/stdin/path",
+			StdoutPath: "/stdout/path",
+			StderrPath: "/stderr/path",
+			LogFile:    "/logfile/path",
+			Environment: map[string]string{
+				"FOO": "BAR",
+				"BAZ": "1",
+			},
+			Input: []model.StepInput{
+				{
+					ID:           "step-input-1",
+					Multiplicity: "wut",
+					Name:         "step-input-name-1",
+					Property:     "step-input-property-1",
+					Retain:       false,
+					Type:         "step-input-type-1",
+					Value:        "step-input-value-1",
+				},
+				{
+					ID:           "step-input-2",
+					Multiplicity: "wut2",
+					Name:         "step-input-name-2",
+					Property:     "step-input-property-2",
+					Retain:       false,
+					Type:         "step-input-type-2",
+					Value:        "step-input-value-2",
+				},
+			},
+			Config: model.StepConfig{
+				Params: []model.StepParam{
+					{
+						ID:    "step-param-1",
+						Name:  "step-param-name-1",
+						Value: "step-param-value-1",
+						Order: 0,
+					},
+					{
+						ID:    "step-param-2",
+						Name:  "step-param-name-2",
+						Value: "step-param-value-2",
+						Order: 1,
+					},
+				},
+			},
+			Component: model.StepComponent{
+				Container: model.Container{
+					ID:   "container-id-1",
+					Name: "container-name-1",
+					Image: model.ContainerImage{
+						ID:   "container-image-1",
+						Name: "container-image-name-1",
+						Tag:  "container-image-tag-1",
+					},
+					VolumesFrom: []model.VolumesFrom{
+						{
+							Tag:           "tag1",
+							Name:          "name1",
+							HostPath:      "/host/path1",
+							ContainerPath: "/container/path1",
+						},
+						{
+							Tag:           "tag2",
+							Name:          "name2",
+							HostPath:      "/host/path2",
+							ContainerPath: "/container/path2",
+						},
+					},
+				},
+			},
+		},
+	},
+}
 
 func TestJobCompose(t *testing.T) {
 	expected := `version: '2'
@@ -254,5 +335,35 @@ func TestNew(t *testing.T) {
 	}
 	if jc.Version != "2" {
 		t.Errorf("version was %s", jc.Version)
+	}
+}
+
+func TestConvertStep(t *testing.T) {
+	jc := New()
+	jc.ConvertStep(&testJob.Steps[0], 0, testJob.InvocationID)
+	if len(jc.Services) != 1 {
+		t.Errorf("number of services was %d and not 1", len(jc.Services))
+	}
+	if _, ok := jc.Services["step-0"]; !ok {
+		t.Error("step-0 not found")
+	}
+	if _, ok := jc.Services["step-0"].Environment["FOO"]; !ok {
+		t.Error("environment var FOO not found")
+	}
+	if jc.Services["step-0"].Environment["FOO"] != "BAR" {
+		t.Errorf("FOO value was %s instead of 'BAR'", jc.Services["step-0"].Environment["FOO"])
+	}
+	if _, ok := jc.Services["step-0"].Environment["BAZ"]; !ok {
+		t.Error("environment var BAZ not found")
+	}
+	if jc.Services["step-0"].Environment["BAZ"] != "1" {
+		t.Errorf("BAZ value was %s instead of '1'", jc.Services["step-0"].Environment["BAZ"])
+	}
+	svc := jc.Services["step-0"]
+	if svc.Image != "container-image-name-1:container-image-tag-1" {
+		t.Errorf("image was %s", svc.Image)
+	}
+	if !reflect.DeepEqual(svc.Command, []string{"step-param-name-1", "step-param-value-1", "step-param-name-2", "step-param-value-2"}) {
+		t.Errorf("command was %#v", svc.Command)
 	}
 }
