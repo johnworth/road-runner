@@ -8,7 +8,7 @@ import (
 )
 
 func TestJobCompose(t *testing.T) {
-	expected := `version: '3.1'
+	expected := `version: '2'
 volumes:
   test0:
     driver: local
@@ -76,8 +76,8 @@ services:
 	if err != nil {
 		t.Error(err)
 	}
-	if jc.Version != "3.1" {
-		t.Errorf("version was %s instead of '3.1'", jc.Version)
+	if jc.Version != "2" {
+		t.Errorf("version was %s instead of '2'", jc.Version)
 	}
 	if len(jc.Networks) != 2 {
 		t.Errorf("number of networks was %d instead of 1", len(jc.Networks))
@@ -252,7 +252,7 @@ func TestNew(t *testing.T) {
 	if jc == nil {
 		t.Error("New() returned nil")
 	}
-	if jc.Version != "3.1" {
+	if jc.Version != "2" {
 		t.Errorf("version was %s", jc.Version)
 	}
 }
