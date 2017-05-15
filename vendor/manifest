@@ -27,6 +27,22 @@
 			"notests": true
 		},
 		{
+			"importpath": "github.com/cyverse-de/logcabin",
+			"repository": "https://github.com/cyverse-de/logcabin",
+			"vcs": "git",
+			"revision": "5cd4eb61491ec0003072bcdbdc4f4733e3f37b28",
+			"branch": "master",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/cyverse-de/messaging",
+			"repository": "https://github.com/cyverse-de/messaging",
+			"vcs": "git",
+			"revision": "e89528783666603bb640004f0b23be7d87da3fbd",
+			"branch": "master",
+			"notests": true
+		},
+		{
 			"importpath": "github.com/cyverse-de/model",
 			"repository": "https://github.com/cyverse-de/model",
 			"vcs": "git",
@@ -152,6 +168,14 @@
 			"repository": "https://github.com/spf13/viper",
 			"vcs": "git",
 			"revision": "0967fc9aceab2ce9da34061253ac10fb99bba5b2",
+			"branch": "master",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/streadway/amqp",
+			"repository": "https://github.com/streadway/amqp",
+			"vcs": "git",
+			"revision": "1c63b162b69cf6834e0b30e496c4cd5d6ee2a1d1",
 			"branch": "master",
 			"notests": true
 		},
