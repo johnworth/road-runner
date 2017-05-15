@@ -7,7 +7,6 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -15,12 +14,15 @@ import (
 	"os/signal"
 	"syscall"
 
+	yaml "gopkg.in/yaml.v2"
+
 	"github.com/Sirupsen/logrus"
 	"github.com/cyverse-de/configurate"
 	"github.com/cyverse-de/dockerops"
 	"github.com/cyverse-de/logcabin"
 	"github.com/cyverse-de/messaging"
 	"github.com/cyverse-de/model"
+	"github.com/cyverse-de/road-runner/dcompose"
 	"github.com/cyverse-de/road-runner/fs"
 	"github.com/cyverse-de/version"
 	"github.com/streadway/amqp"
@@ -61,7 +63,7 @@ func main() {
 				log.Warn("Info didn't get parsed from the job file, can't clean up. Probably don't need to.")
 			}
 			if dckr != nil && job != nil {
-				cleanup(dckr, job)
+				cleanup()
 			}
 			if client != nil && job != nil {
 				fail(client, job, fmt.Sprintf("Received signal %s", sig))
@@ -85,7 +87,7 @@ func main() {
 		jobFile     = flag.String("job", "", "The path to the job description file")
 		cfgPath     = flag.String("config", "", "The path to the config file")
 		writeTo     = flag.String("write-to", "/opt/image-janitor", "The directory to copy job files to.")
-		dockerURI   = flag.String("docker", "unix:///var/run/docker.sock", "The URI for connecting to docker.")
+		composePath = flag.String("docker-compose", "docker-compose.yml", "The filepath to use when writing the docker-compose file.")
 		err         error
 		cfg         *viper.Viper
 	)
@@ -132,11 +134,25 @@ func main() {
 	}
 	defer client.Close()
 	client.SetupPublishing(amqpExchangeName)
-	dckr, err = dockerops.NewDocker(context.Background(), cfg, *dockerURI)
+
+	// Generate the docker-compose file used to execute the job.
+	composer := dcompose.New()
+	composer.InitFromJob(job, cfg)
+	c, err := os.Create(*composePath)
 	if err != nil {
-		fail(client, job, "Failed to connect to local docker socket")
 		log.Fatal(err)
 	}
+	defer c.Close()
+	m, err := yaml.Marshal(composer)
+	if err != nil {
+		log.Fatal(err)
+	}
+	_, err = c.Write(m)
+	if err != nil {
+		log.Fatal(err)
+	}
+	c.Close()
+
 	// The channel that the exit code will be passed along on.
 	exit := make(chan messaging.StatusCode)
 	// Could probably reuse the exit channel, but that's less explicit.
@@ -154,7 +170,7 @@ func main() {
 			running(client, job, "Received stop request")
 			exit <- messaging.StatusKilled
 		})
-	go Run(dckr, client, job, exit)
+	go Run(client, job, exit)
 	exitCode := <-finalExit
 	if err = fs.DeleteJobFile(fs.FS, job.InvocationID, *writeTo); err != nil {
 		log.Errorf("%+v", err)

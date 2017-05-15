@@ -1,14 +1,6 @@
 package main
 
-import (
-	"errors"
-	"fmt"
-	"testing"
-
-	"github.com/cyverse-de/messaging"
-	"github.com/cyverse-de/model"
-	"github.com/docker/docker/api/types"
-)
+import "github.com/cyverse-de/model"
 
 var testJob = &model.Job{
 	ID:           "test-job-id",
@@ -89,160 +81,36 @@ var testJob = &model.Job{
 	},
 }
 
-type DockerOpsTester struct {
-	failCreateDataContainer    bool
-	failCreateWorkingDirVolume bool
-	failDownloadInputs         bool
-	failPull                   bool
-	failPullAuthenticated      bool
-	failRunStep                bool
-	failUploadOutputs          bool
-	createdDataContainers      []*model.VolumesFrom
-	createdWorkingDirVolumes   []string
-	downloadedInputs           []*model.StepInput
-	pulledImages               []string
-	pulledAuthenticatedImages  []string
-	stepsRun                   []*model.Step
-	outputsUploaded            []string
-}
-
-func NewDockerOpsTester() *DockerOpsTester {
-	return &DockerOpsTester{
-		createdDataContainers:     []*model.VolumesFrom{},
-		createdWorkingDirVolumes:  []string{},
-		downloadedInputs:          []*model.StepInput{},
-		pulledImages:              []string{},
-		pulledAuthenticatedImages: []string{},
-		stepsRun:                  []*model.Step{},
-		outputsUploaded:           []string{},
-	}
-}
-
-func (d *DockerOpsTester) CreateDataContainer(vf *model.VolumesFrom, invocationID string) (string, error) {
-	if d.failCreateDataContainer {
-		return "", errors.New("failed to create data container")
-	}
-	d.createdDataContainers = append(d.createdDataContainers, vf)
-	return "test", nil
-}
-
-func (d *DockerOpsTester) CreateWorkingDirVolume(volumeID string) (types.Volume, error) {
-	if d.failCreateWorkingDirVolume {
-		return types.Volume{}, errors.New("failed to create working directory volume")
-	}
-	d.createdWorkingDirVolumes = append(d.createdWorkingDirVolumes, volumeID)
-	return types.Volume{}, nil
-}
-
-func (d *DockerOpsTester) DownloadInputs(j *model.Job, i *model.StepInput, index int) (int64, error) {
-	if d.failDownloadInputs {
-		return 99, errors.New("failed to download input files")
-	}
-	d.downloadedInputs = append(d.downloadedInputs, i)
-	return 0, nil
-}
-
-func (d *DockerOpsTester) Pull(name, tag string) error {
-	if d.failPull {
-		return errors.New("failed to pull image")
-	}
-	d.pulledImages = append(d.pulledImages, fmt.Sprintf("%s:%s", name, tag))
-	return nil
-}
-
-func (d *DockerOpsTester) PullAuthenticated(name, tag, auth string) error {
-	if d.failPullAuthenticated {
-		return errors.New("failed to pull image while authenticated")
-	}
-	d.pulledAuthenticatedImages = append(d.pulledAuthenticatedImages, fmt.Sprintf("%s:%s", name, tag))
-	return nil
-}
-
-func (d *DockerOpsTester) RunStep(s *model.Step, invocationID string, stepIndex int) (int64, error) {
-	if d.failRunStep {
-		return 99, errors.New("failed to run step")
-	}
-	d.stepsRun = append(d.stepsRun, s)
-	return 0, nil
-}
-
-func (d *DockerOpsTester) UploadOutputs(j *model.Job) (int64, error) {
-	if d.failUploadOutputs {
-		return 99, errors.New("failed to upload outputs")
-	}
-	d.outputsUploaded = append(d.outputsUploaded, j.InvocationID)
-	return 0, nil
-}
-
-func TestPullDataImages(t *testing.T) {
-	d := NewDockerOpsTester()
-	u := NewTestJobUpdatePublisher(false)
-	sc, err := pullDataImages(d, u, testJob)
-	if err != nil {
-		t.Error(err)
-	}
-	if sc != messaging.Success {
-		t.Errorf("status code was %d instead of %d", sc, messaging.Success)
-	}
-}
-
-func TestCreateDataContainers(t *testing.T) {
-	d := NewDockerOpsTester()
-	u := NewTestJobUpdatePublisher(false)
-	sc, err := createDataContainers(d, u, testJob)
-	if err != nil {
-		t.Error(err)
-	}
-	if sc != messaging.Success {
-		t.Errorf("status code was %d instead of %d", sc, messaging.Success)
-	}
-}
-
-func TestPullStepImages(t *testing.T) {
-	d := NewDockerOpsTester()
-	u := NewTestJobUpdatePublisher(false)
-	sc, err := pullStepImages(d, u, testJob)
-	if err != nil {
-		t.Error(err)
-	}
-	if sc != messaging.Success {
-		t.Errorf("status code was %d instead of %d", sc, messaging.Success)
-	}
-}
-
-func TestDownloadInputs(t *testing.T) {
-	d := NewDockerOpsTester()
-	u := NewTestJobUpdatePublisher(false)
-	sc, err := downloadInputs(d, u, testJob)
-	if err != nil {
-		t.Error(err)
-	}
-	if sc != messaging.Success {
-		t.Errorf("status code was %d instead of %d", sc, messaging.Success)
-	}
-}
-
-func TestRunAllSteps(t *testing.T) {
-	d := NewDockerOpsTester()
-	u := NewTestJobUpdatePublisher(false)
-	e := make(chan messaging.StatusCode, 0)
-	sc, err := runAllSteps(d, u, testJob, e)
-	if err != nil {
-		t.Error(err)
-	}
-	if sc != messaging.Success {
-		t.Errorf("status code was %d instead of %d", sc, messaging.Success)
-	}
-}
-
-func TestUploadOutputs(t *testing.T) {
-	d := NewDockerOpsTester()
-	u := NewTestJobUpdatePublisher(false)
-	sc, err := uploadOutputs(d, u, testJob)
-	if err != nil {
-		t.Error(err)
-	}
-	if sc != messaging.Success {
-		t.Errorf("status code was %d instead of %d", sc, messaging.Success)
-	}
-}
+// func TestDownloadInputs(t *testing.T) {
+// 	u := NewTestJobUpdatePublisher(false)
+// 	sc, err := downloadInputs(u, testJob)
+// 	if err != nil {
+// 		t.Error(err)
+// 	}
+// 	if sc != messaging.Success {
+// 		t.Errorf("status code was %d instead of %d", sc, messaging.Success)
+// 	}
+// }
+//
+// func TestRunAllSteps(t *testing.T) {
+// 	u := NewTestJobUpdatePublisher(false)
+// 	e := make(chan messaging.StatusCode, 0)
+// 	sc, err := runAllSteps(u, testJob, e)
+// 	if err != nil {
+// 		t.Error(err)
+// 	}
+// 	if sc != messaging.Success {
+// 		t.Errorf("status code was %d instead of %d", sc, messaging.Success)
+// 	}
+// }
+//
+// func TestUploadOutputs(t *testing.T) {
+// 	u := NewTestJobUpdatePublisher(false)
+// 	sc, err := uploadOutputs(u, testJob)
+// 	if err != nil {
+// 		t.Error(err)
+// 	}
+// 	if sc != messaging.Success {
+// 		t.Errorf("status code was %d instead of %d", sc, messaging.Success)
+// 	}
+// }
