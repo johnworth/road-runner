@@ -12,6 +12,7 @@ import (
 var testJob = &model.Job{
 	ID:           "test-job-id",
 	InvocationID: "test-invocation-id",
+	Submitter:    "test-submitter",
 	Steps: []model.Step{
 		{
 			Type:       "condor",
@@ -61,8 +62,9 @@ var testJob = &model.Job{
 			},
 			Component: model.StepComponent{
 				Container: model.Container{
-					ID:   "container-id-1",
-					Name: "container-name-1",
+					ID:        "container-id-1",
+					Name:      "container-name-1",
+					CPUShares: 0,
 					Image: model.ContainerImage{
 						ID:   "container-image-1",
 						Name: "container-image-name-1",
@@ -340,26 +342,26 @@ func TestNew(t *testing.T) {
 
 func TestConvertStep(t *testing.T) {
 	jc := New()
-	jc.ConvertStep(&testJob.Steps[0], 0, testJob.InvocationID)
+	jc.ConvertStep(&testJob.Steps[0], 0, testJob.Submitter, testJob.InvocationID)
 	if len(jc.Services) != 1 {
 		t.Errorf("number of services was %d and not 1", len(jc.Services))
 	}
-	if _, ok := jc.Services["step-0"]; !ok {
-		t.Error("step-0 not found")
+	if _, ok := jc.Services["step_0"]; !ok {
+		t.Error("step_0 not found")
 	}
-	if _, ok := jc.Services["step-0"].Environment["FOO"]; !ok {
+	if _, ok := jc.Services["step_0"].Environment["FOO"]; !ok {
 		t.Error("environment var FOO not found")
 	}
-	if jc.Services["step-0"].Environment["FOO"] != "BAR" {
-		t.Errorf("FOO value was %s instead of 'BAR'", jc.Services["step-0"].Environment["FOO"])
+	if jc.Services["step_0"].Environment["FOO"] != "BAR" {
+		t.Errorf("FOO value was %s instead of 'BAR'", jc.Services["step_0"].Environment["FOO"])
 	}
-	if _, ok := jc.Services["step-0"].Environment["BAZ"]; !ok {
+	if _, ok := jc.Services["step_0"].Environment["BAZ"]; !ok {
 		t.Error("environment var BAZ not found")
 	}
-	if jc.Services["step-0"].Environment["BAZ"] != "1" {
-		t.Errorf("BAZ value was %s instead of '1'", jc.Services["step-0"].Environment["BAZ"])
+	if jc.Services["step_0"].Environment["BAZ"] != "1" {
+		t.Errorf("BAZ value was %s instead of '1'", jc.Services["step_0"].Environment["BAZ"])
 	}
-	svc := jc.Services["step-0"]
+	svc := jc.Services["step_0"]
 	if svc.Image != "container-image-name-1:container-image-tag-1" {
 		t.Errorf("image was %s", svc.Image)
 	}

@@ -137,7 +137,7 @@ func (j *JobCompose) InitFromJob(job *model.Job, cfg *viper.Viper) {
 	vaultToken := cfg.GetString("vault.token")
 
 	for index, input := range job.Inputs() {
-		j.Services[fmt.Sprintf("input-%d", index)] = &Service{
+		j.Services[fmt.Sprintf("input_%d", index)] = &Service{
 			CapAdd:  []string{"IPC_LOCK"},
 			Image:   porklockImageName,
 			Command: input.Arguments(job.Submitter, job.FileMetadata),
@@ -159,11 +159,11 @@ func (j *JobCompose) InitFromJob(job *model.Job, cfg *viper.Viper) {
 
 	// Add the steps to the docker-compose file.
 	for index, step := range job.Steps {
-		j.ConvertStep(&step, index, job.InvocationID)
+		j.ConvertStep(&step, index, job.Submitter, job.InvocationID)
 	}
 
 	// Add the final output job
-	j.Services[fmt.Sprintf("output-%s", job.InvocationID)] = &Service{
+	j.Services[fmt.Sprintf("output_%s", job.InvocationID)] = &Service{
 		CapAdd:  []string{"IPC_LOCK"},
 		Image:   porklockImageName,
 		Command: job.FinalOutputArguments(),
@@ -188,7 +188,7 @@ func (j *JobCompose) InitFromJob(job *model.Job, cfg *viper.Viper) {
 }
 
 // ConvertStep will add the job step to the JobCompose services
-func (j *JobCompose) ConvertStep(step *model.Step, index int, invID string) {
+func (j *JobCompose) ConvertStep(step *model.Step, index int, user, invID string) {
 	// Construct the name of the image
 	// Set the name of the image for the container.
 	var imageName string
@@ -202,7 +202,10 @@ func (j *JobCompose) ConvertStep(step *model.Step, index int, invID string) {
 		imageName = step.Component.Container.Image.Name
 	}
 
-	j.Services[fmt.Sprintf("step-%d", index)] = &Service{
+	step.Environment["IPLANT_USER"] = user
+	step.Environment["IPLANT_EXECUTION_ID"] = invID
+
+	j.Services[fmt.Sprintf("step_%d", index)] = &Service{
 		Image:      imageName,
 		Command:    step.Arguments(),
 		WorkingDir: step.Component.Container.WorkingDirectory(),
@@ -217,7 +220,7 @@ func (j *JobCompose) ConvertStep(step *model.Step, index int, invID string) {
 		Devices:       []string{},
 	}
 
-	svc := j.Services[fmt.Sprintf("step-%d", index)]
+	svc := j.Services[fmt.Sprintf("step_%d", index)]
 	stepContainer := step.Component.Container
 
 	if stepContainer.EntryPoint != "" {
