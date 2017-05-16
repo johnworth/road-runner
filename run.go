@@ -165,6 +165,11 @@ func Run(client JobUpdatePublisher, job *model.Job, cfg *viper.Viper, exit chan 
 		log.Error(err)
 	}
 
+	err = fs.CopyFile(fs.FS, "docker-compose.yml", path.Join(voldir, "docker-compose.yml"))
+	if err != nil {
+		log.Error(err)
+	}
+
 	// let everyone know the job is running
 	running(runner.client, runner.job, fmt.Sprintf("Job %s is running on host %s", runner.job.InvocationID, host))
 

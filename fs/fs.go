@@ -57,6 +57,27 @@ func CopyJobFile(fs FileSystem, uuid, from, toDir string) error {
 	return nil
 }
 
+// CopyFile will copy a file from 'from' to 'to'.
+func CopyFile(fs FileSystem, from, to string) error {
+	inputReader, err := fs.Open(from)
+	if err != nil {
+		return errors.Wrapf(err, "failed to open %s", from)
+	}
+	defer inputReader.Close()
+
+	outputWriter, err := fs.Create(to)
+	if err != nil {
+		return errors.Wrapf(err, "failed to write to %s", to)
+	}
+	defer outputWriter.Close()
+
+	if _, err := io.Copy(outputWriter, inputReader); err != nil {
+		return errors.Wrapf(err, "failed to copy contents of %s to %s", from, to)
+	}
+
+	return nil
+}
+
 // DeleteJobFile deletes the file <uuid>.json from the directory specified by
 // toDir.
 func DeleteJobFile(fs FileSystem, uuid, toDir string) error {
