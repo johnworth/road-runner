@@ -29,13 +29,14 @@ type JobUpdatePublisher interface {
 	PublishJobUpdate(m *messaging.UpdateMessage) error
 }
 
-func createDataContainers(client JobUpdatePublisher, job *model.Job) (messaging.StatusCode, error) {
+func createDataContainers(client JobUpdatePublisher, job *model.Job, cfg *viper.Viper) (messaging.StatusCode, error) {
 	var (
 		err error
 	)
+	composePath := cfg.GetString("docker-compose.path")
 	for index := range job.DataContainers() {
 		running(client, job, fmt.Sprintf("creating data container data_%d", index))
-		dataCommand := exec.Command("docker-compose", "-f", "docker-compose.yml", "up", fmt.Sprintf("data_%d", index))
+		dataCommand := exec.Command(composePath, "-f", "docker-compose.yml", "up", fmt.Sprintf("data_%d", index))
 		dataCommand.Env = os.Environ()
 		dataCommand.Stderr = log.Writer()
 		dataCommand.Stdout = log.Writer()
@@ -56,9 +57,10 @@ func downloadInputs(client JobUpdatePublisher, job *model.Job, cfg *viper.Viper)
 	env := os.Environ()
 	env = append(env, fmt.Sprintf("VAULT_ADDR=%s", cfg.GetString("vault.url")))
 	env = append(env, fmt.Sprintf("VAULT_TOKEN=%s", cfg.GetString("vault.token")))
+	composePath := cfg.GetString("docker-compose.path")
 	for index, input := range job.Inputs() {
 		running(client, job, fmt.Sprintf("Downloading %s", input.IRODSPath()))
-		downloadCommand := exec.Command("docker-compose", "-f", "docker-compose.yml", "up", fmt.Sprintf("input_%d", index))
+		downloadCommand := exec.Command(composePath, "-f", "docker-compose.yml", "up", fmt.Sprintf("input_%d", index))
 		downloadCommand.Env = env
 		downloadCommand.Stderr = log.Writer()
 		downloadCommand.Stdout = log.Writer()
@@ -71,7 +73,7 @@ func downloadInputs(client JobUpdatePublisher, job *model.Job, cfg *viper.Viper)
 	return messaging.Success, nil
 }
 
-func runAllSteps(client JobUpdatePublisher, job *model.Job, exit chan messaging.StatusCode) (messaging.StatusCode, error) {
+func runAllSteps(client JobUpdatePublisher, job *model.Job, cfg *viper.Viper, exit chan messaging.StatusCode) (messaging.StatusCode, error) {
 	var err error
 
 	for idx, step := range job.Steps {
@@ -83,8 +85,8 @@ func runAllSteps(client JobUpdatePublisher, job *model.Job, exit chan messaging.
 				strings.Join(step.Arguments(), " "),
 			),
 		)
-
-		runCommand := exec.Command("docker-compose", "-f", "docker-compose.yml", "up", fmt.Sprintf("step_%d", idx))
+		composePath := cfg.GetString("docker-compose.path")
+		runCommand := exec.Command(composePath, "-f", "docker-compose.yml", "up", fmt.Sprintf("step_%d", idx))
 		runCommand.Env = os.Environ()
 		runCommand.Stdout = log.Writer()
 		runCommand.Stderr = log.Writer()
@@ -116,8 +118,8 @@ func runAllSteps(client JobUpdatePublisher, job *model.Job, exit chan messaging.
 
 func uploadOutputs(client JobUpdatePublisher, job *model.Job, cfg *viper.Viper) (messaging.StatusCode, error) {
 	var err error
-
-	outputCommand := exec.Command("docker-compose", "-f", "docker-compose.yml", "up", "upload_outputs")
+	composePath := cfg.GetString("docker-compose.path")
+	outputCommand := exec.Command(composePath, "-f", "docker-compose.yml", "up", "upload_outputs")
 	outputCommand.Env = os.Environ()
 	outputCommand.Env = []string{
 		fmt.Sprintf("VAULT_ADDR=%s", cfg.GetString("vault.url")),
@@ -202,7 +204,7 @@ func Run(client JobUpdatePublisher, job *model.Job, cfg *viper.Viper, exit chan 
 	}
 
 	if runner.status == messaging.Success {
-		if runner.status, err = createDataContainers(runner.client, job); err != nil {
+		if runner.status, err = createDataContainers(runner.client, job, cfg); err != nil {
 			log.Error(err)
 		}
 	}
@@ -218,7 +220,7 @@ func Run(client JobUpdatePublisher, job *model.Job, cfg *viper.Viper, exit chan 
 	// Only attempt to run the steps if the input downloads succeeded. No reason
 	// to run the steps if there's no/corrupted data to operate on.
 	if runner.status == messaging.Success {
-		if runner.status, err = runAllSteps(runner.client, job, exit); err != nil {
+		if runner.status, err = runAllSteps(runner.client, job, cfg, exit); err != nil {
 			log.Error(err)
 		}
 	}
