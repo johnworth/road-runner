@@ -158,6 +158,13 @@ func Run(client JobUpdatePublisher, job *model.Job, cfg *viper.Viper, exit chan 
 		log.Error(err)
 	}
 
+	voldir := path.Join(cwd, dcompose.VOLUMEDIR, "logs")
+	log.Infof("path to the volume directory: %s\n", voldir)
+	err = os.MkdirAll(voldir, 0755)
+	if err != nil {
+		log.Error(err)
+	}
+
 	// let everyone know the job is running
 	running(runner.client, runner.job, fmt.Sprintf("Job %s is running on host %s", runner.job.InvocationID, host))
 
@@ -172,7 +179,7 @@ func Run(client JobUpdatePublisher, job *model.Job, cfg *viper.Viper, exit chan 
 	}
 
 	if _, err = os.Stat("iplant.cmd"); err != nil {
-		if err = os.Rename("iplant.cmd", "logs/iplant.cmd"); err != nil {
+		if err = os.Rename("iplant.cmd", path.Join(cwd, dcompose.VOLUMEDIR, "logs", "iplant.cmd")); err != nil {
 			log.Error(err)
 		}
 	}
@@ -186,13 +193,6 @@ func Run(client JobUpdatePublisher, job *model.Job, cfg *viper.Viper, exit chan 
 	if err != nil {
 		log.Error(err)
 		runner.status = messaging.StatusDockerPullFailed
-	}
-
-	voldir := path.Join(cwd, dcompose.VOLUMEDIR, "logs")
-	log.Infof("path to the volume directory: %s\n", voldir)
-	err = os.Mkdir(voldir, 0755)
-	if err != nil {
-		log.Error(err)
 	}
 
 	if err = fs.WriteJobSummary(fs.FS, voldir, job); err != nil {
