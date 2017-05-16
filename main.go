@@ -18,7 +18,6 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/cyverse-de/configurate"
-	"github.com/cyverse-de/dockerops"
 	"github.com/cyverse-de/logcabin"
 	"github.com/cyverse-de/messaging"
 	"github.com/cyverse-de/model"
@@ -32,7 +31,6 @@ import (
 
 var (
 	job              *model.Job
-	dckr             *dockerops.Docker
 	client           *messaging.Client
 	amqpExchangeName string
 	amqpExchangeType string
