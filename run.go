@@ -36,6 +36,7 @@ func createDataContainers(client JobUpdatePublisher, job *model.Job) (messaging.
 	for index := range job.DataContainers() {
 		running(client, job, fmt.Sprintf("creating data container data_%d", index))
 		dataCommand := exec.Command("docker-compose", "-f", "docker-compose.yml", "up", fmt.Sprintf("data_%d", index))
+		dataCommand.Env = os.Environ()
 		dataCommand.Stderr = log.Writer()
 		dataCommand.Stdout = log.Writer()
 		if err = dataCommand.Run(); err != nil {
@@ -52,13 +53,13 @@ func downloadInputs(client JobUpdatePublisher, job *model.Job, cfg *viper.Viper)
 		err      error
 		exitCode int64
 	)
+	env := os.Environ()
+	env = append(env, fmt.Sprintf("VAULT_ADDR=%s", cfg.GetString("vault.url")))
+	env = append(env, fmt.Sprintf("VAULT_TOKEN=%s", cfg.GetString("vault.token")))
 	for index, input := range job.Inputs() {
 		running(client, job, fmt.Sprintf("Downloading %s", input.IRODSPath()))
 		downloadCommand := exec.Command("docker-compose", "-f", "docker-compose.yml", "up", fmt.Sprintf("input_%d", index))
-		downloadCommand.Env = []string{
-			fmt.Sprintf("VAULT_ADDR=%s", cfg.GetString("vault.url")),
-			fmt.Sprintf("VAULT_TOKEN=%s", cfg.GetString("vault.token")),
-		}
+		downloadCommand.Env = env
 		downloadCommand.Stderr = log.Writer()
 		downloadCommand.Stdout = log.Writer()
 		if err = downloadCommand.Run(); err != nil {
@@ -84,6 +85,7 @@ func runAllSteps(client JobUpdatePublisher, job *model.Job, exit chan messaging.
 		)
 
 		runCommand := exec.Command("docker-compose", "-f", "docker-compose.yml", "up", fmt.Sprintf("step_%d", idx))
+		runCommand.Env = os.Environ()
 		runCommand.Stdout = log.Writer()
 		runCommand.Stderr = log.Writer()
 		err = runCommand.Run()
@@ -116,6 +118,7 @@ func uploadOutputs(client JobUpdatePublisher, job *model.Job, cfg *viper.Viper) 
 	var err error
 
 	outputCommand := exec.Command("docker-compose", "-f", "docker-compose.yml", "up", "upload_outputs")
+	outputCommand.Env = os.Environ()
 	outputCommand.Env = []string{
 		fmt.Sprintf("VAULT_ADDR=%s", cfg.GetString("vault.url")),
 		fmt.Sprintf("VAULT_TOKEN=%s", cfg.GetString("vault.token")),
@@ -173,6 +176,7 @@ func Run(client JobUpdatePublisher, job *model.Job, cfg *viper.Viper, exit chan 
 	}
 
 	pullCommand := exec.Command("docker-compose", "-f", "docker-compose.yml", "pull", "--parallel")
+	pullCommand.Env = os.Environ()
 	pullCommand.Dir = cwd
 	pullCommand.Stdout = log.Writer()
 	pullCommand.Stderr = log.Writer()
