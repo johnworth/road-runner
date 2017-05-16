@@ -12,6 +12,7 @@ import (
 	"github.com/cyverse-de/road-runner/dcompose"
 	"github.com/cyverse-de/road-runner/fs"
 	"github.com/pkg/errors"
+	"github.com/spf13/viper"
 )
 
 // JobRunner provides the functionality needed to run jobs.
@@ -46,7 +47,7 @@ func createDataContainers(client JobUpdatePublisher, job *model.Job) (messaging.
 	return messaging.Success, nil
 }
 
-func downloadInputs(client JobUpdatePublisher, job *model.Job) (messaging.StatusCode, error) {
+func downloadInputs(client JobUpdatePublisher, job *model.Job, cfg *viper.Viper) (messaging.StatusCode, error) {
 	var (
 		err      error
 		exitCode int64
@@ -54,6 +55,10 @@ func downloadInputs(client JobUpdatePublisher, job *model.Job) (messaging.Status
 	for index, input := range job.Inputs() {
 		running(client, job, fmt.Sprintf("Downloading %s", input.IRODSPath()))
 		downloadCommand := exec.Command("docker-compose", "-f", "docker-compose.yml", "up", fmt.Sprintf("input_%d", index))
+		downloadCommand.Env = []string{
+			fmt.Sprintf("VAULT_ADDR=%s", cfg.GetString("vault.url")),
+			fmt.Sprintf("VAULT_TOKEN=%s", cfg.GetString("vault.token")),
+		}
 		downloadCommand.Stderr = log.Writer()
 		downloadCommand.Stdout = log.Writer()
 		if err = downloadCommand.Run(); err != nil {
@@ -107,10 +112,14 @@ func runAllSteps(client JobUpdatePublisher, job *model.Job, exit chan messaging.
 	return messaging.Success, err
 }
 
-func uploadOutputs(client JobUpdatePublisher, job *model.Job) (messaging.StatusCode, error) {
+func uploadOutputs(client JobUpdatePublisher, job *model.Job, cfg *viper.Viper) (messaging.StatusCode, error) {
 	var err error
 
 	outputCommand := exec.Command("docker-compose", "-f", "docker-compose.yml", "up", "upload_outputs")
+	outputCommand.Env = []string{
+		fmt.Sprintf("VAULT_ADDR=%s", cfg.GetString("vault.url")),
+		fmt.Sprintf("VAULT_TOKEN=%s", cfg.GetString("vault.token")),
+	}
 	outputCommand.Stdout = log.Writer()
 	outputCommand.Stderr = log.Writer()
 	err = outputCommand.Run()
@@ -125,7 +134,7 @@ func uploadOutputs(client JobUpdatePublisher, job *model.Job) (messaging.StatusC
 }
 
 // Run executes the job, and returns the exit code on the exit channel.
-func Run(client JobUpdatePublisher, job *model.Job, exit chan messaging.StatusCode) {
+func Run(client JobUpdatePublisher, job *model.Job, cfg *viper.Viper, exit chan messaging.StatusCode) {
 	runner := &JobRunner{
 		client: client,
 		exit:   exit,
@@ -133,28 +142,29 @@ func Run(client JobUpdatePublisher, job *model.Job, exit chan messaging.StatusCo
 		status: messaging.Success,
 	}
 
-	// host, err := os.Hostname()
-	// if err != nil {
-	// 	log.Error(err)
-	// 	host = "UNKNOWN"
-	// }
+	host, err := os.Hostname()
+	if err != nil {
+		log.Error(err)
+		host = "UNKNOWN"
+	}
 
 	cwd, err := os.Getwd()
 	if err != nil {
 		log.Error(err)
 	}
 
-	// // let everyone know the job is running
-	// running(runner.client, runner.job, fmt.Sprintf("Job %s is running on host %s", runner.job.InvocationID, host))
-	// transferTrigger, err := os.Create("logs/de-transfer-trigger.log")
-	// if err != nil {
-	// 	log.Error(err)
-	// } else {
-	// 	_, err = transferTrigger.WriteString("This is only used to force HTCondor to transfer files.")
-	// 	if err != nil {
-	// 		log.Error(err)
-	// 	}
-	// }
+	// let everyone know the job is running
+	running(runner.client, runner.job, fmt.Sprintf("Job %s is running on host %s", runner.job.InvocationID, host))
+
+	transferTrigger, err := os.Create(path.Join(cwd, dcompose.VOLUMEDIR, "logs", "de-transfer-trigger.log"))
+	if err != nil {
+		log.Error(err)
+	} else {
+		_, err = transferTrigger.WriteString("This is only used to force HTCondor to transfer files.")
+		if err != nil {
+			log.Error(err)
+		}
+	}
 
 	if _, err = os.Stat("iplant.cmd"); err != nil {
 		if err = os.Rename("iplant.cmd", "logs/iplant.cmd"); err != nil {
@@ -197,7 +207,7 @@ func Run(client JobUpdatePublisher, job *model.Job, exit chan messaging.StatusCo
 	// correct versions of the tools. Don't bother pulling in data in that case,
 	// things are already screwed up.
 	if runner.status == messaging.Success {
-		if runner.status, err = downloadInputs(runner.client, job); err != nil {
+		if runner.status, err = downloadInputs(runner.client, job, cfg); err != nil {
 			log.Error(err)
 		}
 	}
@@ -211,7 +221,7 @@ func Run(client JobUpdatePublisher, job *model.Job, exit chan messaging.StatusCo
 	// Always attempt to transfer outputs. There might be logs that can help
 	// debug issues when the job fails.
 	running(runner.client, runner.job, fmt.Sprintf("Beginning to upload outputs to %s", runner.job.OutputDirectory()))
-	if runner.status, err = uploadOutputs(runner.client, job); err != nil {
+	if runner.status, err = uploadOutputs(runner.client, job, cfg); err != nil {
 		log.Error(err)
 	}
 	// Always inform upstream of the job status.

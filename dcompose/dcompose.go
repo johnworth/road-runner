@@ -134,8 +134,6 @@ func (j *JobCompose) InitFromJob(job *model.Job, cfg *viper.Viper, workingdir st
 	porklockImage := cfg.GetString("porklock.image")
 	porklockTag := cfg.GetString("porklock.tag")
 	porklockImageName := fmt.Sprintf("%s:%s", porklockImage, porklockTag)
-	vaultURL := cfg.GetString("vault.url")
-	vaultToken := cfg.GetString("vault.token")
 
 	for index, dc := range job.DataContainers() {
 		svcKey := fmt.Sprintf("data_%d", index)
@@ -169,8 +167,8 @@ func (j *JobCompose) InitFromJob(job *model.Job, cfg *viper.Viper, workingdir st
 			Image:   porklockImageName,
 			Command: input.Arguments(job.Submitter, job.FileMetadata),
 			Environment: map[string]string{
-				"VAULT_ADDR":  vaultURL,
-				"VAULT_TOKEN": vaultToken,
+				"VAULT_ADDR":  "'${VAULT_ADDR}'",
+				"VAULT_TOKEN": "'${VAULT_TOKEN}'",
 				"JOB_UUID":    job.InvocationID,
 			},
 			Logging:    &LoggingConfig{Driver: "none"},
@@ -195,8 +193,8 @@ func (j *JobCompose) InitFromJob(job *model.Job, cfg *viper.Viper, workingdir st
 		Image:   porklockImageName,
 		Command: job.FinalOutputArguments(),
 		Environment: map[string]string{
-			"VAULT_ADDR":  vaultURL,
-			"VAULT_TOKEN": vaultToken,
+			"VAULT_ADDR":  "'${VAULT_ADDR}'",
+			"VAULT_TOKEN": "'${VAULT_TOKEN}'",
 			"JOB_UUID":    job.InvocationID,
 		},
 		WorkingDir: WORKDIR,
