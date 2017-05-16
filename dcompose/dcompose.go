@@ -2,6 +2,7 @@ package dcompose
 
 import (
 	"fmt"
+	"path"
 	"strconv"
 
 	"github.com/cyverse-de/model"
@@ -45,8 +46,8 @@ type Volume struct {
 
 // Network is a Docker network definition in the docker-compose file.
 type Network struct {
-	Driver     string
-	EnableIPv6 bool              `yaml:"enable_ipv6"`
+	Driver string
+	// EnableIPv6 bool              `yaml:"enable_ipv6"`
 	DriverOpts map[string]string `yaml:"driver_opts"`
 }
 
@@ -59,26 +60,26 @@ type LoggingConfig struct {
 // ServiceNetworkConfig configures a docker-compose service to use a Docker
 // Network.
 type ServiceNetworkConfig struct {
-	Aliases []string `yaml:",omitempty,flow"`
+	Aliases []string `yaml:",omitempty"`
 }
 
 // Service configures a docker-compose service.
 type Service struct {
 	CapAdd        []string          `yaml:"cap_add,flow"`
 	CapDrop       []string          `yaml:"cap_drop,flow"`
-	Command       []string          `yaml:",omitempty,flow"`
+	Command       []string          `yaml:",omitempty"`
 	ContainerName string            `yaml:"container_name,omitempty"`
 	CPUSet        string            `yaml:"cpuset,omitempty"`
 	CPUShares     string            `yaml:"cpu_shares,omitempty"`
 	CPUQuota      string            `yaml:"cpu_quota,omitempty"`
-	DependsOn     []string          `yaml:"depends_on,omitempty,flow"`
+	DependsOn     []string          `yaml:"depends_on,omitempty"`
 	Devices       []string          `yaml:",omitempty"`
-	DNS           []string          `yaml:",omitempty,flow"`
-	DNSSearch     []string          `yaml:"dns_search,omitempty,flow"`
-	TMPFS         []string          `yaml:",omitempty,flow"`
+	DNS           []string          `yaml:",omitempty"`
+	DNSSearch     []string          `yaml:"dns_search,omitempty"`
+	TMPFS         []string          `yaml:",omitempty"`
 	EntryPoint    string            `yaml:",omitempty"`
 	Environment   map[string]string `yaml:",omitempty"`
-	Expose        []string          `yaml:",omitempty,flow"`
+	Expose        []string          `yaml:",omitempty"`
 	Image         string
 	Labels        map[string]string                `yaml:",omitempty"`
 	Logging       *LoggingConfig                   `yaml:",omitempty"`
@@ -87,9 +88,9 @@ type Service struct {
 	MemSwappiness string                           `yaml:"mem_swappiness,omitempty"`
 	NetworkMode   string                           `yaml:"network_mode,omitempty"`
 	Networks      map[string]*ServiceNetworkConfig `yaml:",omitempty"`
-	Ports         []string                         `yaml:",omitempty,flow"`
-	Volumes       []string                         `yaml:",omitempty,flow"`
-	VolumesFrom   []string                         `yaml:"volumes_from,omitempty,flow"`
+	Ports         []string                         `yaml:",omitempty"`
+	Volumes       []string                         `yaml:",omitempty"`
+	VolumesFrom   []string                         `yaml:"volumes_from,omitempty"`
 	WorkingDir    string                           `yaml:"working_dir,omitempty"`
 }
 
@@ -114,18 +115,18 @@ func New() *JobCompose {
 
 // InitFromJob fills out values as appropriate for running in the DE's Condor
 // Cluster.
-func (j *JobCompose) InitFromJob(job *model.Job, cfg *viper.Viper) {
+func (j *JobCompose) InitFromJob(job *model.Job, cfg *viper.Viper, workingdir string) {
 	// Each job gets its own bridged network.
 	j.Networks[job.InvocationID] = &Network{
 		Driver: "bridge",
 	}
-
+	volpath := path.Join(workingdir, VOLUMEDIR)
 	// The volume containing the local working directory
 	j.Volumes[job.InvocationID] = &Volume{
 		Driver: "local",
 		Options: map[string]string{
 			"type":   "none",
-			"device": VOLUMEDIR,
+			"device": volpath,
 			"o":      "bind",
 		},
 	}
@@ -135,6 +136,32 @@ func (j *JobCompose) InitFromJob(job *model.Job, cfg *viper.Viper) {
 	porklockImageName := fmt.Sprintf("%s:%s", porklockImage, porklockTag)
 	vaultURL := cfg.GetString("vault.url")
 	vaultToken := cfg.GetString("vault.token")
+
+	for index, dc := range job.DataContainers() {
+		svcKey := fmt.Sprintf("data_%d", index)
+		j.Services[svcKey] = &Service{
+			Image:         fmt.Sprintf("%s:%s", dc.Name, dc.Tag),
+			ContainerName: fmt.Sprintf("%s-%s", dc.NamePrefix, job.InvocationID),
+			EntryPoint:    "/bin/true",
+			Logging:       &LoggingConfig{Driver: "none"},
+			Labels: map[string]string{
+				model.DockerLabelKey: strconv.Itoa(DataContainer),
+			},
+		}
+
+		svc := j.Services[svcKey]
+		if dc.HostPath != "" || dc.ContainerPath != "" {
+			var rw string
+			if dc.ReadOnly {
+				rw = "ro"
+			} else {
+				rw = "rw"
+			}
+			svc.Volumes = []string{
+				fmt.Sprintf("%s:%s:%s", dc.HostPath, dc.ContainerPath, rw),
+			}
+		}
+	}
 
 	for index, input := range job.Inputs() {
 		j.Services[fmt.Sprintf("input_%d", index)] = &Service{
@@ -163,7 +190,7 @@ func (j *JobCompose) InitFromJob(job *model.Job, cfg *viper.Viper) {
 	}
 
 	// Add the final output job
-	j.Services[fmt.Sprintf("output_%s", job.InvocationID)] = &Service{
+	j.Services["upload_outputs"] = &Service{
 		CapAdd:  []string{"IPC_LOCK"},
 		Image:   porklockImageName,
 		Command: job.FinalOutputArguments(),
@@ -212,7 +239,7 @@ func (j *JobCompose) ConvertStep(step *model.Step, index int, user, invID string
 		Labels: map[string]string{
 			model.DockerLabelKey: strconv.Itoa(StepContainer),
 		},
-		Logging:       &LoggingConfig{Driver: "none"},
+		//Logging:       &LoggingConfig{Driver: "none"},
 		ContainerName: step.Component.Container.Name,
 		Environment:   step.Environment,
 		VolumesFrom:   []string{},
@@ -239,11 +266,16 @@ func (j *JobCompose) ConvertStep(step *model.Step, index int, user, invID string
 		svc.NetworkMode = stepContainer.NetworkMode
 	}
 
-	// Handles volumes created by other containers. Should be changed in
-	// so that data containers are used to populate top-level independent
-	// volumes.
+	// Handles volumes created by other containers.
 	for _, vf := range stepContainer.VolumesFrom {
-		svc.VolumesFrom = append(svc.VolumesFrom, fmt.Sprintf("container:%s-%s", vf.NamePrefix, invID))
+		containerName := fmt.Sprintf("%s-%s", vf.NamePrefix, invID)
+		var foundService string
+		for svckey, svc := range j.Services { // svckey is the docker-compose service name.
+			if svc.ContainerName == containerName {
+				foundService = svckey
+			}
+		}
+		svc.VolumesFrom = append(svc.VolumesFrom, foundService)
 	}
 
 	// The working directory needs to be mounted as a volume.

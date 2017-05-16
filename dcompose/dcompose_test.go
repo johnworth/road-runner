@@ -106,10 +106,8 @@ volumes:
 networks:
   local:
     driver: bridge
-    enable_ipv6: true
   remote:
     driver: bridge
-    enable_ipv6: false
 services:
   service-test-1:
     image: hello-world
@@ -171,18 +169,18 @@ services:
 	if jc.Networks["local"].Driver != "bridge" {
 		t.Errorf("local network driver was %s instead of 'bridge'", jc.Networks["local"].Driver)
 	}
-	if !jc.Networks["local"].EnableIPv6 {
-		t.Error("enable_ipv6 was false")
-	}
+	// if !jc.Networks["local"].EnableIPv6 {
+	// 	t.Error("enable_ipv6 was false")
+	// }
 	if _, ok := jc.Networks["remote"]; !ok {
 		t.Errorf("could not find the 'remote' network")
 	}
 	if jc.Networks["remote"].Driver != "bridge" {
 		t.Errorf("local network driver was %s instead of 'bridge'", jc.Networks["local"].Driver)
 	}
-	if jc.Networks["remote"].EnableIPv6 {
-		t.Error("enable_ipv6 was true")
-	}
+	// if jc.Networks["remote"].EnableIPv6 {
+	// 	t.Error("enable_ipv6 was true")
+	// }
 	if len(jc.Volumes) != 2 {
 		t.Errorf("number of volumes was %d instead of 2", len(jc.Volumes))
 	}

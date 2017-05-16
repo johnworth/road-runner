@@ -28,6 +28,24 @@ type JobUpdatePublisher interface {
 	PublishJobUpdate(m *messaging.UpdateMessage) error
 }
 
+func createDataContainers(client JobUpdatePublisher, job *model.Job) (messaging.StatusCode, error) {
+	var (
+		err error
+	)
+	for index := range job.DataContainers() {
+		running(client, job, fmt.Sprintf("creating data container data_%d", index))
+		dataCommand := exec.Command("docker-compose", "-f", "docker-compose.yml", "up", fmt.Sprintf("data_%d", index))
+		dataCommand.Stderr = log.Writer()
+		dataCommand.Stdout = log.Writer()
+		if err = dataCommand.Run(); err != nil {
+			running(client, job, fmt.Sprintf("error creating data container data_%d: %s", index, err.Error()))
+			return messaging.StatusDockerCreateFailed, errors.Wrapf(err, "failed to create data container data_%d", index)
+		}
+		running(client, job, fmt.Sprintf("finished creating data container data_%d", index))
+	}
+	return messaging.Success, nil
+}
+
 func downloadInputs(client JobUpdatePublisher, job *model.Job) (messaging.StatusCode, error) {
 	var (
 		err      error
@@ -35,7 +53,7 @@ func downloadInputs(client JobUpdatePublisher, job *model.Job) (messaging.Status
 	)
 	for index, input := range job.Inputs() {
 		running(client, job, fmt.Sprintf("Downloading %s", input.IRODSPath()))
-		downloadCommand := exec.Command("docker-compose", "-f", "docker-compose.yml", fmt.Sprintf("input-%d", index))
+		downloadCommand := exec.Command("docker-compose", "-f", "docker-compose.yml", "up", fmt.Sprintf("input_%d", index))
 		downloadCommand.Stderr = log.Writer()
 		downloadCommand.Stdout = log.Writer()
 		if err = downloadCommand.Run(); err != nil {
@@ -60,7 +78,7 @@ func runAllSteps(client JobUpdatePublisher, job *model.Job, exit chan messaging.
 			),
 		)
 
-		runCommand := exec.Command("docker-compose", "-f", "docker-compose.yml", fmt.Sprintf("step-%d", idx))
+		runCommand := exec.Command("docker-compose", "-f", "docker-compose.yml", "up", fmt.Sprintf("step_%d", idx))
 		runCommand.Stdout = log.Writer()
 		runCommand.Stderr = log.Writer()
 		err = runCommand.Run()
@@ -92,7 +110,7 @@ func runAllSteps(client JobUpdatePublisher, job *model.Job, exit chan messaging.
 func uploadOutputs(client JobUpdatePublisher, job *model.Job) (messaging.StatusCode, error) {
 	var err error
 
-	outputCommand := exec.Command("docker-compose", "-f", "docker-compose.yml", fmt.Sprintf("output-%s", job.InvocationID))
+	outputCommand := exec.Command("docker-compose", "-f", "docker-compose.yml", "up", "upload_outputs")
 	outputCommand.Stdout = log.Writer()
 	outputCommand.Stderr = log.Writer()
 	err = outputCommand.Run()
@@ -115,28 +133,28 @@ func Run(client JobUpdatePublisher, job *model.Job, exit chan messaging.StatusCo
 		status: messaging.Success,
 	}
 
-	host, err := os.Hostname()
-	if err != nil {
-		log.Error(err)
-		host = "UNKNOWN"
-	}
+	// host, err := os.Hostname()
+	// if err != nil {
+	// 	log.Error(err)
+	// 	host = "UNKNOWN"
+	// }
 
 	cwd, err := os.Getwd()
 	if err != nil {
 		log.Error(err)
 	}
 
-	// let everyone know the job is running
-	running(runner.client, runner.job, fmt.Sprintf("Job %s is running on host %s", runner.job.InvocationID, host))
-	transferTrigger, err := os.Create("logs/de-transfer-trigger.log")
-	if err != nil {
-		log.Error(err)
-	} else {
-		_, err = transferTrigger.WriteString("This is only used to force HTCondor to transfer files.")
-		if err != nil {
-			log.Error(err)
-		}
-	}
+	// // let everyone know the job is running
+	// running(runner.client, runner.job, fmt.Sprintf("Job %s is running on host %s", runner.job.InvocationID, host))
+	// transferTrigger, err := os.Create("logs/de-transfer-trigger.log")
+	// if err != nil {
+	// 	log.Error(err)
+	// } else {
+	// 	_, err = transferTrigger.WriteString("This is only used to force HTCondor to transfer files.")
+	// 	if err != nil {
+	// 		log.Error(err)
+	// 	}
+	// }
 
 	if _, err = os.Stat("iplant.cmd"); err != nil {
 		if err = os.Rename("iplant.cmd", "logs/iplant.cmd"); err != nil {
@@ -168,6 +186,13 @@ func Run(client JobUpdatePublisher, job *model.Job, exit chan messaging.StatusCo
 	if err = fs.WriteJobParameters(fs.FS, voldir, job); err != nil {
 		log.Error(err)
 	}
+
+	if runner.status == messaging.Success {
+		if runner.status, err = createDataContainers(runner.client, job); err != nil {
+			log.Error(err)
+		}
+	}
+
 	// If pulls didn't succeed then we can't guarantee that we've got the
 	// correct versions of the tools. Don't bother pulling in data in that case,
 	// things are already screwed up.

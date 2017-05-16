@@ -135,9 +135,13 @@ func main() {
 	defer client.Close()
 	client.SetupPublishing(amqpExchangeName)
 
+	wd, err := os.Getwd()
+	if err != nil {
+		log.Fatal(err)
+	}
 	// Generate the docker-compose file used to execute the job.
 	composer := dcompose.New()
-	composer.InitFromJob(job, cfg)
+	composer.InitFromJob(job, cfg, wd)
 	c, err := os.Create(*composePath)
 	if err != nil {
 		log.Fatal(err)
