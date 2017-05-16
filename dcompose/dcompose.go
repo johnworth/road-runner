@@ -167,8 +167,8 @@ func (j *JobCompose) InitFromJob(job *model.Job, cfg *viper.Viper, workingdir st
 			Image:   porklockImageName,
 			Command: input.Arguments(job.Submitter, job.FileMetadata),
 			Environment: map[string]string{
-				"VAULT_ADDR":  "'${VAULT_ADDR}'",
-				"VAULT_TOKEN": "'${VAULT_TOKEN}'",
+				"VAULT_ADDR":  "${VAULT_ADDR}",
+				"VAULT_TOKEN": "${VAULT_TOKEN}",
 				"JOB_UUID":    job.InvocationID,
 			},
 			Logging:    &LoggingConfig{Driver: "none"},
@@ -193,8 +193,8 @@ func (j *JobCompose) InitFromJob(job *model.Job, cfg *viper.Viper, workingdir st
 		Image:   porklockImageName,
 		Command: job.FinalOutputArguments(),
 		Environment: map[string]string{
-			"VAULT_ADDR":  "'${VAULT_ADDR}'",
-			"VAULT_TOKEN": "'${VAULT_TOKEN}'",
+			"VAULT_ADDR":  "${VAULT_ADDR}",
+			"VAULT_TOKEN": "${VAULT_TOKEN}",
 			"JOB_UUID":    job.InvocationID,
 		},
 		WorkingDir: WORKDIR,
