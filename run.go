@@ -183,8 +183,8 @@ func Run(client JobUpdatePublisher, job *model.Job, cfg *viper.Viper, exit chan 
 			log.Error(err)
 		}
 	}
-
-	pullCommand := exec.Command("docker-compose", "-f", "docker-compose.yml", "pull", "--parallel")
+	composePath := cfg.GetString("docker-compose.path")
+	pullCommand := exec.Command(composePath, "-f", "docker-compose.yml", "pull", "--parallel")
 	pullCommand.Env = os.Environ()
 	pullCommand.Dir = cwd
 	pullCommand.Stdout = log.Writer()
