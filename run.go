@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -73,6 +75,21 @@ func downloadInputs(client JobUpdatePublisher, job *model.Job, cfg *viper.Viper)
 	return messaging.Success, nil
 }
 
+type authInfo struct {
+	username string
+	password string
+}
+
+func parse(b64 string) (*authInfo, error) {
+	jsonstring, err := base64.StdEncoding.DecodeString(b64)
+	if err != nil {
+		return nil, err
+	}
+	a := &authInfo{}
+	err = json.Unmarshal(jsonstring, a)
+	return a, err
+}
+
 func runAllSteps(client JobUpdatePublisher, job *model.Job, cfg *viper.Viper, exit chan messaging.StatusCode) (messaging.StatusCode, error) {
 	var err error
 
@@ -120,7 +137,6 @@ func uploadOutputs(client JobUpdatePublisher, job *model.Job, cfg *viper.Viper) 
 	var err error
 	composePath := cfg.GetString("docker-compose.path")
 	outputCommand := exec.Command(composePath, "-f", "docker-compose.yml", "up", "upload_outputs")
-	outputCommand.Env = os.Environ()
 	outputCommand.Env = []string{
 		fmt.Sprintf("VAULT_ADDR=%s", cfg.GetString("vault.url")),
 		fmt.Sprintf("VAULT_TOKEN=%s", cfg.GetString("vault.token")),
@@ -188,6 +204,26 @@ func Run(client JobUpdatePublisher, job *model.Job, cfg *viper.Viper, exit chan 
 			log.Error(err)
 		}
 	}
+
+	// Login so that images can be pulled.
+	var authinfo *authInfo
+	for _, img := range job.ContainerImages() {
+		if img.Auth != "" {
+			authinfo, err = parse(img.Auth)
+			if err != nil {
+				log.Error(err)
+			}
+			authCommand := exec.Command("docker", "login", "--username", authinfo.username, "--password", authinfo.password)
+			if err != nil {
+				log.Error(err)
+			}
+			err = authCommand.Run()
+			if err != nil {
+				log.Error(err)
+			}
+		}
+	}
+
 	composePath := cfg.GetString("docker-compose.path")
 	pullCommand := exec.Command(composePath, "-f", "docker-compose.yml", "pull", "--parallel")
 	pullCommand.Env = os.Environ()
