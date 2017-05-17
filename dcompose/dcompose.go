@@ -237,7 +237,7 @@ func (j *JobCompose) ConvertStep(step *model.Step, index int, user, invID string
 		Labels: map[string]string{
 			model.DockerLabelKey: strconv.Itoa(StepContainer),
 		},
-		//Logging:       &LoggingConfig{Driver: "none"},
+		Logging:       &LoggingConfig{Driver: "none"},
 		ContainerName: step.Component.Container.Name,
 		Environment:   step.Environment,
 		VolumesFrom:   []string{},
