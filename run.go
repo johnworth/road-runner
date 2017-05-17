@@ -15,7 +15,6 @@ import (
 	"github.com/cyverse-de/road-runner/dcompose"
 	"github.com/cyverse-de/road-runner/fs"
 	"github.com/kr/pty"
-	homedir "github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 )
@@ -180,12 +179,6 @@ func Run(client JobUpdatePublisher, job *model.Job, cfg *viper.Viper, exit chan 
 		host = "UNKNOWN"
 	}
 
-	home, err := homedir.Dir()
-	if err != nil {
-		log.Error(err)
-	}
-	dockerhome := path.Join(home, ".docker")
-
 	cwd, err := os.Getwd()
 	if err != nil {
 		log.Error(err)
@@ -225,6 +218,7 @@ func Run(client JobUpdatePublisher, job *model.Job, cfg *viper.Viper, exit chan 
 	// Pull the official docker image.
 	dockerimage := "docker:17.05.0-ce"
 	dockerBin := cfg.GetString("docker.path")
+	dockerCfg := cfg.GetString("docker.cfg")
 	dockerPullCommand := exec.Command(dockerBin, "pull", dockerimage)
 	dockerPullCommand.Stdout = log.Writer()
 	dockerPullCommand.Stderr = log.Writer()
@@ -240,7 +234,7 @@ func Run(client JobUpdatePublisher, job *model.Job, cfg *viper.Viper, exit chan 
 			if err != nil {
 				log.Error(err)
 			}
-			authCommand := exec.Command(dockerBin, "run", "--rm", "-it", "-v", "/var/run/docker.sock:/var/run/docker.sock", "-v", fmt.Sprintf("%s:%s", dockerhome, "/root/.docker/"), dockerimage, "login", "--username", authinfo.Username, "--password", authinfo.Password, parseRepo(img.Name))
+			authCommand := exec.Command(dockerBin, "run", "--rm", "-it", "-v", "/var/run/docker.sock:/var/run/docker.sock", "-v", fmt.Sprintf("%s:%s", dockerCfg, "/root/.docker"), dockerimage, "login", "--username", authinfo.Username, "--password", authinfo.Password, parseRepo(img.Name))
 			f, err := pty.Start(authCommand)
 			if err != nil {
 				log.Error(err)
