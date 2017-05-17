@@ -279,6 +279,20 @@ func (j *JobCompose) ConvertStep(step *model.Step, index int, user, invID string
 	// The working directory needs to be mounted as a volume.
 	svc.Volumes = append(svc.Volumes, fmt.Sprintf("%s:%s:rw", invID, stepContainer.WorkingDirectory()))
 
+	for _, v := range stepContainer.Volumes {
+		var rw string
+		if v.ReadOnly {
+			rw = "ro"
+		} else {
+			rw = "rw"
+		}
+		if v.HostPath == "" {
+			svc.Volumes = append(svc.Volumes, fmt.Sprintf("%s:%s", v.ContainerPath, rw))
+		} else {
+			svc.Volumes = append(svc.Volumes, fmt.Sprintf("%s:%s:%s", v.HostPath, v.ContainerPath, rw))
+		}
+	}
+
 	for _, device := range stepContainer.Devices {
 		svc.Devices = append(svc.Devices,
 			fmt.Sprintf("%s:%s:%s",
