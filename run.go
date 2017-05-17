@@ -214,17 +214,7 @@ func Run(client JobUpdatePublisher, job *model.Job, cfg *viper.Viper, exit chan 
 			log.Error(err)
 		}
 	}
-
-	// Pull the official docker image.
-	// dockerimage := "docker:17.05.0-ce"
 	dockerBin := cfg.GetString("docker.path")
-	// //dockerCfg := cfg.GetString("docker.cfg")
-	// dockerPullCommand := exec.Command(dockerBin, "pull", dockerimage)
-	// dockerPullCommand.Stdout = log.Writer()
-	// dockerPullCommand.Stderr = log.Writer()
-	// if err = dockerPullCommand.Run(); err != nil {
-	// 	log.Error(err)
-	// }
 
 	// Login so that images can be pulled.
 	var authinfo *authInfo

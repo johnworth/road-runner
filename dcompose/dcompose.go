@@ -116,10 +116,10 @@ func New() *JobCompose {
 // InitFromJob fills out values as appropriate for running in the DE's Condor
 // Cluster.
 func (j *JobCompose) InitFromJob(job *model.Job, cfg *viper.Viper, workingdir string) {
-	// Each job gets its own bridged network.
-	// j.Networks[job.InvocationID] = &Network{
-	// 	Driver: "bridge",
-	// }
+	//Each job gets its own bridged network.
+	j.Networks[job.InvocationID] = &Network{
+		Driver: "bridge",
+	}
 	volpath := path.Join(workingdir, VOLUMEDIR)
 	// The volume containing the local working directory
 	j.Volumes[job.InvocationID] = &Volume{
@@ -201,9 +201,9 @@ func (j *JobCompose) InitFromJob(job *model.Job, cfg *viper.Viper, workingdir st
 		Volumes: []string{
 			fmt.Sprintf("%s:%s:%s", job.InvocationID, WORKDIR, "rw"),
 		},
-		// Networks: map[string]*ServiceNetworkConfig{
-		// 	job.InvocationID: &ServiceNetworkConfig{},
-		// },
+		Networks: map[string]*ServiceNetworkConfig{
+			job.InvocationID: &ServiceNetworkConfig{},
+		},
 		Labels: map[string]string{
 			model.DockerLabelKey: job.InvocationID,
 			TypeLabel:            strconv.Itoa(OutputContainer),
