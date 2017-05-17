@@ -213,7 +213,7 @@ func Run(client JobUpdatePublisher, job *model.Job, cfg *viper.Viper, exit chan 
 			if err != nil {
 				log.Error(err)
 			}
-			authCommand := exec.Command("docker", "login", "--username", authinfo.username, "--password", authinfo.password)
+			authCommand := exec.Command(cfg.GetString("docker.path"), "login", "--username", authinfo.username, "--password", authinfo.password)
 			if err != nil {
 				log.Error(err)
 			}

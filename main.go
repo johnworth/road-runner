@@ -84,6 +84,7 @@ func main() {
 		writeTo     = flag.String("write-to", "/opt/image-janitor", "The directory to copy job files to.")
 		composePath = flag.String("docker-compose", "docker-compose.yml", "The filepath to use when writing the docker-compose file.")
 		composeBin  = flag.String("docker-compose-path", "/usr/bin/docker-compose", "The path to the docker-compose binary.")
+		dockerBin   = flag.String("docker-path", "/usr/bin/docker", "The path to the docker binary.")
 		err         error
 		cfg         *viper.Viper
 	)
@@ -108,6 +109,7 @@ func main() {
 		log.Fatal("--job must be set.")
 	}
 	cfg.Set("docker-compose.path", *composeBin)
+	cfg.Set("docker.path", *dockerBin)
 	data, err := ioutil.ReadFile(*jobFile)
 	if err != nil {
 		log.Fatal(err)
