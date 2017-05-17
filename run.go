@@ -231,9 +231,13 @@ func Run(client JobUpdatePublisher, job *model.Job, cfg *viper.Viper, exit chan 
 	}
 	// Always attempt to transfer outputs. There might be logs that can help
 	// debug issues when the job fails.
+	var outputStatus messaging.StatusCode
 	running(runner.client, runner.job, fmt.Sprintf("Beginning to upload outputs to %s", runner.job.OutputDirectory()))
-	if runner.status, err = uploadOutputs(runner.client, job, cfg); err != nil {
+	if outputStatus, err = uploadOutputs(runner.client, job, cfg); err != nil {
 		log.Error(err)
+	}
+	if outputStatus != messaging.Success {
+		runner.status = outputStatus
 	}
 	// Always inform upstream of the job status.
 	if runner.status != messaging.Success {
