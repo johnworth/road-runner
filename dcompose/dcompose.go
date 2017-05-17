@@ -230,6 +230,13 @@ func (j *JobCompose) ConvertStep(step *model.Step, index int, user, invID string
 	step.Environment["IPLANT_USER"] = user
 	step.Environment["IPLANT_EXECUTION_ID"] = invID
 
+	var containername string
+	if step.Component.Container.Name != "" {
+		containername = step.Component.Container.Name
+	} else {
+		containername = fmt.Sprintf("step_%d_%s", index, invID)
+	}
+
 	j.Services[fmt.Sprintf("step_%d", index)] = &Service{
 		Image:      imageName,
 		Command:    step.Arguments(),
@@ -237,8 +244,8 @@ func (j *JobCompose) ConvertStep(step *model.Step, index int, user, invID string
 		Labels: map[string]string{
 			model.DockerLabelKey: strconv.Itoa(StepContainer),
 		},
-		Logging:       &LoggingConfig{Driver: "none"},
-		ContainerName: step.Component.Container.Name,
+		//Logging:       &LoggingConfig{Driver: "none"},
+		ContainerName: containername,
 		Environment:   step.Environment,
 		VolumesFrom:   []string{},
 		Volumes:       []string{},
