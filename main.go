@@ -47,6 +47,18 @@ func init() {
 }
 
 func main() {
+	var (
+		showVersion = flag.Bool("version", false, "Print the version information")
+		jobFile     = flag.String("job", "", "The path to the job description file")
+		cfgPath     = flag.String("config", "", "The path to the config file")
+		writeTo     = flag.String("write-to", "/opt/image-janitor", "The directory to copy job files to.")
+		composePath = flag.String("docker-compose", "docker-compose.yml", "The filepath to use when writing the docker-compose file.")
+		composeBin  = flag.String("docker-compose-path", "/usr/bin/docker-compose", "The path to the docker-compose binary.")
+		dockerBin   = flag.String("docker-path", "/usr/bin/docker", "The path to the docker binary.")
+		dockerCfg   = flag.String("docker-cfg", "/var/lib/condor/.docker", "The path to the .docker directory.")
+		err         error
+		cfg         *viper.Viper
+	)
 	logcabin.Init("road-runner", "road-runner")
 	sigquitter := make(chan bool)
 	sighandler := InitSignalHandler()
@@ -58,7 +70,7 @@ func main() {
 				log.Warn("Info didn't get parsed from the job file, can't clean up. Probably don't need to.")
 			}
 			if job != nil {
-				cleanup()
+				cleanup(cfg)
 			}
 			if client != nil && job != nil {
 				fail(client, job, fmt.Sprintf("Received signal %s", sig))
@@ -76,18 +88,6 @@ func main() {
 		syscall.SIGTERM,
 		syscall.SIGSTOP,
 		syscall.SIGQUIT,
-	)
-	var (
-		showVersion = flag.Bool("version", false, "Print the version information")
-		jobFile     = flag.String("job", "", "The path to the job description file")
-		cfgPath     = flag.String("config", "", "The path to the config file")
-		writeTo     = flag.String("write-to", "/opt/image-janitor", "The directory to copy job files to.")
-		composePath = flag.String("docker-compose", "docker-compose.yml", "The filepath to use when writing the docker-compose file.")
-		composeBin  = flag.String("docker-compose-path", "/usr/bin/docker-compose", "The path to the docker-compose binary.")
-		dockerBin   = flag.String("docker-path", "/usr/bin/docker", "The path to the docker binary.")
-		dockerCfg   = flag.String("docker-cfg", "/var/lib/condor/.docker", "The path to the .docker directory.")
-		err         error
-		cfg         *viper.Viper
 	)
 	flag.Parse()
 	if *showVersion {
@@ -163,7 +163,7 @@ func main() {
 	// Could probably reuse the exit channel, but that's less explicit.
 	finalExit := make(chan messaging.StatusCode)
 	// Launch the go routine that will handle job exits by signal or timer.
-	go Exit(exit, finalExit)
+	go Exit(cfg, exit, finalExit)
 	go client.Listen()
 	client.AddDeletableConsumer(
 		amqpExchangeName,

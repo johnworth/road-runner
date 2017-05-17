@@ -216,15 +216,15 @@ func Run(client JobUpdatePublisher, job *model.Job, cfg *viper.Viper, exit chan 
 	}
 
 	// Pull the official docker image.
-	dockerimage := "docker:17.05.0-ce"
+	// dockerimage := "docker:17.05.0-ce"
 	dockerBin := cfg.GetString("docker.path")
-	dockerCfg := cfg.GetString("docker.cfg")
-	dockerPullCommand := exec.Command(dockerBin, "pull", dockerimage)
-	dockerPullCommand.Stdout = log.Writer()
-	dockerPullCommand.Stderr = log.Writer()
-	if err = dockerPullCommand.Run(); err != nil {
-		log.Error(err)
-	}
+	// //dockerCfg := cfg.GetString("docker.cfg")
+	// dockerPullCommand := exec.Command(dockerBin, "pull", dockerimage)
+	// dockerPullCommand.Stdout = log.Writer()
+	// dockerPullCommand.Stderr = log.Writer()
+	// if err = dockerPullCommand.Run(); err != nil {
+	// 	log.Error(err)
+	// }
 
 	// Login so that images can be pulled.
 	var authinfo *authInfo
@@ -234,7 +234,8 @@ func Run(client JobUpdatePublisher, job *model.Job, cfg *viper.Viper, exit chan 
 			if err != nil {
 				log.Error(err)
 			}
-			authCommand := exec.Command(dockerBin, "run", "--rm", "-it", "-v", "/var/run/docker.sock:/var/run/docker.sock", "-v", fmt.Sprintf("%s:%s", dockerCfg, "/root/.docker"), dockerimage, "login", "--username", authinfo.Username, "--password", authinfo.Password, parseRepo(img.Name))
+			//authCommand := exec.Command(dockerBin, "run", "--rm", "-it", "-v", "/var/run/docker.sock:/var/run/docker.sock", "-v", fmt.Sprintf("%s:%s", dockerCfg, "/root/.docker"), dockerimage, "login", "--username", authinfo.Username, "--password", authinfo.Password, parseRepo(img.Name))
+			authCommand := exec.Command(dockerBin, "login", "--username", authinfo.Username, "--password", authinfo.Password, parseRepo(img.Name))
 			f, err := pty.Start(authCommand)
 			if err != nil {
 				log.Error(err)
