@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path"
@@ -13,6 +14,7 @@ import (
 	"github.com/cyverse-de/model"
 	"github.com/cyverse-de/road-runner/dcompose"
 	"github.com/cyverse-de/road-runner/fs"
+	"github.com/kr/pty"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 )
@@ -76,8 +78,8 @@ func downloadInputs(client JobUpdatePublisher, job *model.Job, cfg *viper.Viper)
 }
 
 type authInfo struct {
-	username string
-	password string
+	Username string
+	Password string
 }
 
 func parse(b64 string) (*authInfo, error) {
@@ -154,6 +156,14 @@ func uploadOutputs(client JobUpdatePublisher, job *model.Job, cfg *viper.Viper) 
 	return messaging.Success, nil
 }
 
+func parseRepo(imagename string) string {
+	if strings.Contains(imagename, "/") {
+		parts := strings.Split(imagename, "/")
+		return parts[0]
+	}
+	return ""
+}
+
 // Run executes the job, and returns the exit code on the exit channel.
 func Run(client JobUpdatePublisher, job *model.Job, cfg *viper.Viper, exit chan messaging.StatusCode) {
 	runner := &JobRunner{
@@ -205,6 +215,16 @@ func Run(client JobUpdatePublisher, job *model.Job, cfg *viper.Viper, exit chan 
 		}
 	}
 
+	// Pull the official docker image.
+	dockerimage := "docker:17.05.0-ce"
+	dockerBin := cfg.GetString("docker.path")
+	dockerPullCommand := exec.Command(dockerBin, "pull", dockerimage)
+	dockerPullCommand.Stdout = log.Writer()
+	dockerPullCommand.Stderr = log.Writer()
+	if err = dockerPullCommand.Run(); err != nil {
+		log.Error(err)
+	}
+
 	// Login so that images can be pulled.
 	var authinfo *authInfo
 	for _, img := range job.ContainerImages() {
@@ -213,11 +233,15 @@ func Run(client JobUpdatePublisher, job *model.Job, cfg *viper.Viper, exit chan 
 			if err != nil {
 				log.Error(err)
 			}
-			authCommand := exec.Command(cfg.GetString("docker.path"), "login", "--username", authinfo.username, "--password", authinfo.password)
+			authCommand := exec.Command(dockerBin, "run", "--rm", "-it", "-v", "/var/run/docker.sock:/var/run/docker.sock", dockerimage, "login", "--username", authinfo.Username, "--password", authinfo.Password, parseRepo(img.Name))
+			f, err := pty.Start(authCommand)
 			if err != nil {
 				log.Error(err)
 			}
-			err = authCommand.Run()
+			go func() {
+				io.Copy(log.Writer(), f)
+			}()
+			err = authCommand.Wait()
 			if err != nil {
 				log.Error(err)
 			}

@@ -127,6 +127,14 @@
 			"notests": true
 		},
 		{
+			"importpath": "github.com/kr/pty",
+			"repository": "https://github.com/kr/pty",
+			"vcs": "git",
+			"revision": "2c10821df3c3cf905230d078702dfbe9404c9b23",
+			"branch": "master",
+			"notests": true
+		},
+		{
 			"importpath": "github.com/magiconair/properties",
 			"repository": "https://github.com/magiconair/properties",
 			"vcs": "git",
