@@ -171,7 +171,6 @@ func (j *JobCompose) InitFromJob(job *model.Job, cfg *viper.Viper, workingdir st
 				"VAULT_TOKEN": "${VAULT_TOKEN}",
 				"JOB_UUID":    job.InvocationID,
 			},
-			Logging:    &LoggingConfig{Driver: "none"},
 			WorkingDir: WORKDIR,
 			Volumes: []string{
 				fmt.Sprintf("%s:%s:rw", job.InvocationID, WORKDIR),
@@ -208,7 +207,6 @@ func (j *JobCompose) InitFromJob(job *model.Job, cfg *viper.Viper, workingdir st
 			model.DockerLabelKey: job.InvocationID,
 			TypeLabel:            strconv.Itoa(OutputContainer),
 		},
-		Logging: &LoggingConfig{Driver: "none"},
 	}
 }
 
@@ -244,7 +242,6 @@ func (j *JobCompose) ConvertStep(step *model.Step, index int, user, invID string
 		Labels: map[string]string{
 			model.DockerLabelKey: strconv.Itoa(StepContainer),
 		},
-		//Logging:       &LoggingConfig{Driver: "none"},
 		ContainerName: containername,
 		Environment:   step.Environment,
 		VolumesFrom:   []string{},

@@ -125,7 +125,7 @@ func (r *JobRunner) createDataContainers() (messaging.StatusCode, error) {
 	composePath := r.cfg.GetString("docker-compose.path")
 	for index := range r.job.DataContainers() {
 		running(r.client, r.job, fmt.Sprintf("creating data container data_%d", index))
-		dataCommand := exec.Command(composePath, "-f", "docker-compose.yml", "up", fmt.Sprintf("data_%d", index))
+		dataCommand := exec.Command(composePath, "-f", "docker-compose.yml", "up", "--no-color", fmt.Sprintf("data_%d", index))
 		dataCommand.Env = os.Environ()
 		dataCommand.Stderr = log.Writer()
 		dataCommand.Stdout = log.Writer()
@@ -140,7 +140,6 @@ func (r *JobRunner) createDataContainers() (messaging.StatusCode, error) {
 
 func (r *JobRunner) downloadInputs() (messaging.StatusCode, error) {
 	var (
-		err      error
 		exitCode int64
 	)
 	env := os.Environ()
@@ -149,14 +148,26 @@ func (r *JobRunner) downloadInputs() (messaging.StatusCode, error) {
 	composePath := r.cfg.GetString("docker-compose.path")
 	for index, input := range r.job.Inputs() {
 		running(r.client, r.job, fmt.Sprintf("Downloading %s", input.IRODSPath()))
-		downloadCommand := exec.Command(composePath, "-f", "docker-compose.yml", "up", fmt.Sprintf("input_%d", index))
+		stderr, err := os.Create(path.Join(r.logsDir, fmt.Sprintf("logs-stderr-input-%d", index)))
+		if err != nil {
+			log.Error(err)
+		}
+		defer stderr.Close()
+		stdout, err := os.Create(path.Join(r.logsDir, fmt.Sprintf("logs-stderr-input-%d", index)))
+		if err != nil {
+			log.Error(err)
+		}
+		defer stdout.Close()
+		downloadCommand := exec.Command(composePath, "-f", "docker-compose.yml", "up", "--no-color", fmt.Sprintf("input_%d", index))
 		downloadCommand.Env = env
-		downloadCommand.Stderr = log.Writer()
-		downloadCommand.Stdout = log.Writer()
+		downloadCommand.Stderr = stderr
+		downloadCommand.Stdout = stdout
 		if err = downloadCommand.Run(); err != nil {
 			running(r.client, r.job, fmt.Sprintf("error downloading %s: %s", input.IRODSPath(), err.Error()))
 			return messaging.StatusInputFailed, errors.Wrapf(err, "failed to download %s with an exit code of %d", input.IRODSPath(), exitCode)
 		}
+		stdout.Close()
+		stderr.Close()
 		running(r.client, r.job, fmt.Sprintf("finished downloading %s", input.IRODSPath()))
 	}
 	return messaging.Success, nil
@@ -189,11 +200,23 @@ func (r *JobRunner) runAllSteps() (messaging.StatusCode, error) {
 				strings.Join(step.Arguments(), " "),
 			),
 		)
+		stdout, err := os.Create(path.Join(r.logsDir, fmt.Sprintf("condor-stdout-%d", idx)))
+		if err != nil {
+			log.Error(err)
+		}
+		defer stdout.Close()
+
+		stderr, err := os.Create(path.Join(r.logsDir, fmt.Sprintf("condor-stderr-%d", idx)))
+		if err != nil {
+			log.Error(err)
+		}
+		defer stderr.Close()
+
 		composePath := r.cfg.GetString("docker-compose.path")
-		runCommand := exec.Command(composePath, "-f", "docker-compose.yml", "up", fmt.Sprintf("step_%d", idx))
+		runCommand := exec.Command(composePath, "-f", "docker-compose.yml", "up", "--no-color", fmt.Sprintf("step_%d", idx))
 		runCommand.Env = os.Environ()
-		runCommand.Stdout = log.Writer()
-		runCommand.Stderr = log.Writer()
+		runCommand.Stdout = stdout
+		runCommand.Stderr = stderr
 		err = runCommand.Run()
 
 		if err != nil {
@@ -216,6 +239,8 @@ func (r *JobRunner) runAllSteps() (messaging.StatusCode, error) {
 				strings.Join(step.Arguments(), " "),
 			),
 		)
+		stdout.Close()
+		stderr.Close()
 	}
 	return messaging.Success, err
 }
@@ -223,13 +248,23 @@ func (r *JobRunner) runAllSteps() (messaging.StatusCode, error) {
 func (r *JobRunner) uploadOutputs() (messaging.StatusCode, error) {
 	var err error
 	composePath := r.cfg.GetString("docker-compose.path")
-	outputCommand := exec.Command(composePath, "-f", "docker-compose.yml", "up", "upload_outputs")
+	stdout, err := os.Create(path.Join(r.logsDir, fmt.Sprintf("logs-stdout-output")))
+	if err != nil {
+		log.Error(err)
+	}
+	defer stdout.Close()
+	stderr, err := os.Create(path.Join(r.logsDir, fmt.Sprintf("logs-stderr-output")))
+	if err != nil {
+		log.Error(err)
+	}
+	defer stderr.Close()
+	outputCommand := exec.Command(composePath, "-f", "docker-compose.yml", "up", "--no-color", "upload_outputs")
 	outputCommand.Env = []string{
 		fmt.Sprintf("VAULT_ADDR=%s", r.cfg.GetString("vault.url")),
 		fmt.Sprintf("VAULT_TOKEN=%s", r.cfg.GetString("vault.token")),
 	}
-	outputCommand.Stdout = log.Writer()
-	outputCommand.Stderr = log.Writer()
+	outputCommand.Stdout = stdout
+	outputCommand.Stderr = stderr
 	err = outputCommand.Run()
 
 	if err != nil {
