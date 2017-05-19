@@ -89,29 +89,37 @@ func main() {
 		syscall.SIGSTOP,
 		syscall.SIGQUIT,
 	)
+
 	flag.Parse()
+
 	if *showVersion {
 		version.AppVersion()
 		os.Exit(0)
 	}
+
 	if *cfgPath == "" {
 		log.Fatal("--config must be set.")
 	}
+
 	log.Infof("Reading config from %s\n", *cfgPath)
 	if _, err = os.Open(*cfgPath); err != nil {
 		log.Fatal(*cfgPath)
 	}
+
 	cfg, err = configurate.Init(*cfgPath)
 	if err != nil {
 		log.Fatal(err)
 	}
 	log.Infof("Done reading config from %s\n", *cfgPath)
+
 	if *jobFile == "" {
 		log.Fatal("--job must be set.")
 	}
+
 	cfg.Set("docker-compose.path", *composeBin)
 	cfg.Set("docker.path", *dockerBin)
 	cfg.Set("docker.cfg", *dockerCfg)
+
 	data, err := ioutil.ReadFile(*jobFile)
 	if err != nil {
 		log.Fatal(err)
@@ -126,6 +134,7 @@ func main() {
 	if err = fs.CopyJobFile(fs.FS, job.InvocationID, *jobFile, *writeTo); err != nil {
 		log.Fatal(err)
 	}
+
 	uri := cfg.GetString("amqp.uri")
 	amqpExchangeName = cfg.GetString("amqp.exchange.name")
 	amqpExchangeType = cfg.GetString("amqp.exchange.type")
@@ -140,6 +149,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	// Generate the docker-compose file used to execute the job.
 	composer := dcompose.New()
 	composer.InitFromJob(job, cfg, wd)

@@ -94,8 +94,15 @@ func (r *JobRunner) DockerLogin() error {
 			if err != nil {
 				return err
 			}
-			//authCommand := exec.Command(dockerBin, "run", "--rm", "-it", "-v", "/var/run/docker.sock:/var/run/docker.sock", "-v", fmt.Sprintf("%s:%s", dockerCfg, "/root/.docker"), dockerimage, "login", "--username", authinfo.Username, "--password", authinfo.Password, parseRepo(img.Name))
-			authCommand := exec.Command(dockerBin, "login", "--username", authinfo.Username, "--password", authinfo.Password, parseRepo(img.Name))
+			authCommand := exec.Command(
+				dockerBin,
+				"login",
+				"--username",
+				authinfo.Username,
+				"--password",
+				authinfo.Password,
+				parseRepo(img.Name),
+			)
 			f, err := pty.Start(authCommand)
 			if err != nil {
 				return err
@@ -125,7 +132,14 @@ func (r *JobRunner) createDataContainers() (messaging.StatusCode, error) {
 	composePath := r.cfg.GetString("docker-compose.path")
 	for index := range r.job.DataContainers() {
 		running(r.client, r.job, fmt.Sprintf("creating data container data_%d", index))
-		dataCommand := exec.Command(composePath, "-f", "docker-compose.yml", "up", "--no-color", fmt.Sprintf("data_%d", index))
+		dataCommand := exec.Command(
+			composePath,
+			"-f",
+			"docker-compose.yml",
+			"up",
+			"--no-color",
+			fmt.Sprintf("data_%d", index),
+		)
 		dataCommand.Env = os.Environ()
 		dataCommand.Stderr = log.Writer()
 		dataCommand.Stdout = log.Writer()
