@@ -128,9 +128,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	if _, err = os.Open(*writeTo); err != nil {
-		log.Fatal(err)
-	}
 	if err = fs.CopyJobFile(fs.FS, job.InvocationID, *jobFile, *writeTo); err != nil {
 		log.Fatal(err)
 	}
@@ -170,11 +167,17 @@ func main() {
 
 	// The channel that the exit code will be passed along on.
 	exit := make(chan messaging.StatusCode)
+
 	// Could probably reuse the exit channel, but that's less explicit.
 	finalExit := make(chan messaging.StatusCode)
+
 	// Launch the go routine that will handle job exits by signal or timer.
 	go Exit(cfg, exit, finalExit)
+
+	// Process AMQP messages.
 	go client.Listen()
+
+	// Set up a handler to respond to stop requests.
 	client.AddDeletableConsumer(
 		amqpExchangeName,
 		amqpExchangeType,
@@ -185,10 +188,18 @@ func main() {
 			running(client, job, "Received stop request")
 			exit <- messaging.StatusKilled
 		})
+
+	// Run the job in a goroutine.
 	go Run(client, job, cfg, exit)
+
+	// Prevents road-runner from exiting before the job is complete.
 	exitCode := <-finalExit
+
+	// Nuke the job's JSON file from the image-janitor directory.
 	if err = fs.DeleteJobFile(fs.FS, job.InvocationID, *writeTo); err != nil {
 		log.Errorf("%+v", err)
 	}
+
+	// Make sure to exit with the same exit code as the tool.
 	os.Exit(int(exitCode))
 }
