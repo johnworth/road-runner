@@ -7,9 +7,16 @@ import (
 	"github.com/spf13/viper"
 )
 
+// This is called from main() as well, which is why it's a separate function.
 func cleanup(cfg *viper.Viper) {
 	var err error
-	downCommand := exec.Command(cfg.GetString("docker-compose.path"), "-f", "docker-compose.yml", "down", "--rmi", "all", "-v")
+	downCommand := exec.Command(
+		cfg.GetString("docker-compose.path"),
+		"-f", "docker-compose.yml",
+		"down",         // down seems to be the only way to clean up images with d-c.
+		"--rmi", "all", // tells d-c to clean up all images used by a service
+		"-v", // not verbose, tells docker-compose to clean up related volumes.
+	)
 	downCommand.Stderr = log.Writer()
 	downCommand.Stdout = log.Writer()
 	if err = downCommand.Run(); err != nil {
