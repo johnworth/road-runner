@@ -88,6 +88,14 @@ func DeleteJobFile(fs FileSystem, uuid, toDir string) error {
 	return nil
 }
 
+// DeleteFile deletes the specified file.
+func DeleteFile(fs FileSystem, path string) error {
+	if err := fs.Remove(path); err != nil {
+		return errors.Wrapf(err, "failed to remove %s", path)
+	}
+	return nil
+}
+
 // WriteCSV writes out the passed in records as CSV content to the passed in
 // io.Writer.
 func WriteCSV(fileWriter io.Writer, records [][]string) (err error) {
